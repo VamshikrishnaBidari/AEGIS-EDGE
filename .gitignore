@@ -1,0 +1,44 @@
+# =====================================================================
+# AEGIS EDGE — .gitignore
+# Excludes heavy ExecuTorch binaries (*.pte), virtual environments,
+# runtime logs/PCAPs, and temporary scratch folders from GitHub uploads.
+# =====================================================================
+
+# 1. Heavy ExecuTorch / LLM weights (1.7 GB model.pte — generate or copy locally via SETUP.md)
+*.pte
+*.pt
+*.bin.bak
+*.gguf
+*.safetensors
+
+# 2. Python Virtual Environments & Bytecode Caches
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.Python
+pip-wheel-metadata/
+
+# 3. Runtime Logs, PCAP Captures & Benchmark Dumps
+alerts.jsonl
+benchmarks/
+*.pcap
+*.pcapng
+*.log
+
+# 4. Workspace / Scratch / Agent Folders (when git is initialized at project root)
+workspace_temp/
+comp-phish/
+.arkenos/
+.optimus/
+
+# 5. OS & Editor Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*~

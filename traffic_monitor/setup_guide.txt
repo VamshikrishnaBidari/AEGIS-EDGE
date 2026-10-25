@@ -1,0 +1,75 @@
+# Network Intrusion Detection System - Setup Guide
+
+Highly recommended to run these tests on an isolated Mobile Hotspot.
+
+=========================================
+SECTION 1: WINDOWS SETUP
+=========================================
+
+1. Install Python
+Ensure Python 3 is installed on your system. You can download it from python.org. Check the box to "Add Python to PATH" during installation.
+
+2. Install Npcap (CRITICAL FOR WINDOWS)
+Scapy requires a packet capture driver to sniff network traffic on Windows.
+- Go to: https://npcap.com/#download
+- Download and run the Npcap installer.
+- During installation, the default options are fine (you do not strictly need "WinPcap API-compatible mode" unless you have other legacy tools).
+
+3. Install Python Dependencies
+Open PowerShell as Administrator and run:
+> pip install scapy psutil
+
+4. Find Your Network Details
+Connect to your Mobile Hotspot, then find your current IP and interface name:
+- To find your IP Address, run:
+  > ipconfig
+  (Look for the "IPv4 Address" under your active Wi-Fi adapter).
+- To find your Interface Name, run:
+  > Get-NetAdapter
+  (Note the exact spelling under the "Name" column, usually "Wi-Fi").
+
+5. Run the Monitor
+In PowerShell (Run as Administrator), navigate to your project folder and start the monitor:
+> python main.py --ip <YOUR_IPV4_ADDRESS> --iface "<YOUR_INTERFACE_NAME>"
+Example: python main.py --ip 192.168.43.50 --iface "Wi-Fi"
+
+
+=========================================
+SECTION 2: LINUX / RASPBERRY PI SETUP
+=========================================
+
+1. Install Python and System Prerequisites
+Linux requires `libpcap` for packet sniffing. Open your terminal and run:
+> sudo apt update
+> sudo apt install python3 python3-pip libpcap-dev tcpdump
+
+2. Install Python Dependencies
+> pip3 install scapy psutil
+(Note: Depending on your Linux distribution, you might need to use a virtual environment or add the `--break-system-packages` flag if pip complains about externally managed environments).
+
+3. Find Your Network Details
+Connect to your Mobile Hotspot, then find your current IP and interface name:
+> ip a
+- Look for your active interface (e.g., wlan0, eth0, enp3s0).
+- Note the interface name and the "inet" (IPv4) address.
+
+4. Run the Monitor
+On Linux, capturing packets requires root privileges. Navigate to your project folder and use `sudo`:
+> sudo python3 main.py --ip <YOUR_IPV4_ADDRESS> --iface "<YOUR_INTERFACE_NAME>"
+Example: sudo python3 main.py --ip 192.168.43.50 --iface "wlan0"
+
+
+=========================================
+SECTION 3: DEMO WORKFLOW (GOLDEN BASELINE)
+=========================================
+
+To avoid false positives and cold-start delays during a live demo, precompute your "Golden Baseline".
+
+1. Generate the Baseline:
+Run the monitor on a clean network with the `--save-baseline` flag. Browse the web normally for a few minutes.
+> python main.py --ip <IP> --iface "<IFACE>" --save-baseline
+Press Ctrl+C to stop. This will generate a 'golden_baseline.json' file.
+
+2. Live Demo:
+Simply run the monitor normally. It will automatically load the JSON file and instantly begin protecting the device based on your pre-approved traffic profile.
+> python main.py --ip <IP> --iface "<IFACE>"

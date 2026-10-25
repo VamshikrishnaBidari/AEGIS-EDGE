@@ -1,0 +1,191 @@
+========================================================================
+AEGIS EDGE — 4-PILLAR SETUP, TESTING & HANDOFF GUIDE
+ARM Bharat AI-SoC Challenge 2026-27 (Problem Statement 3)
+========================================================================
+
+1. WHAT IS COMPLETED IN THIS CODEBASE (ALL 4 PILLARS)
+------------------------------------------------------------------------
+Everything is unified inside the `codebase/` folder:
+
+- Pillar 1: Network Intrusion Detection (`traffic_monitor/`)
+  Captures packets via Scapy, builds a per-device baseline, and flags
+  port scans, SYN/ICMP floods, and high-entropy DNS exfiltration/DGA.
+
+- Pillar 2: SMS Scam Ensemble Classifier (`sms_detector/`)
+  Soft-voting ensemble (Calibrated LinearSVC + Logistic Regression +
+  Multinomial Naive Bayes) on word & character TF-IDF features.
+
+- Pillar 3: Hybrid Phishing URL Detector (`phishing_detector/`)
+  Two-stage offline engine trained on PhishTank (66,615 URLs) +
+  CompPhish (15,358 URLs):
+    * Stage A: 225 KB Bloom Filter (`bloom_filter.bin`) for O(1) instant
+      blacklist matching across 73,819 verified phishing URLs.
+    * Stage B: 15-feature Random Forest (`phishing_rf_model.joblib`) +
+      CompPhish Markov-chain gibberish detector (`gib_model.pki`),
+      brand-impersonation check, and URL shortener/free-host lists.
+
+- Pillar 4: Offline Llama-3.2-1B ExecuTorch Advisor (`llama_advisor.py`
+  + `llama32_1b_instruct/`)
+  Connects all 4 pillars together! When you input an SMS, a URL, or a
+  network alert:
+    1) Automatically extracts any URLs from the SMS and runs the SMS ML
+       model and Phishing URL ML engine IN PARALLEL.
+    2) Applies Indian Banking/UPI/OTP fraud rules (detecting OTP-sharing
+       traps and UPI PIN collect traps while protecting genuine bank
+       OTP/transaction notifications from false alarms).
+    3) Feeds the structured evidence into the local quantized
+       Llama-3.2-1B-Instruct ExecuTorch model (`model.pte`) to generate
+       a plain-English explanation and 2 safety actions 100% offline.
+
+
+2. IMPORTANT NOTE ON RESPONSE TIMING (~30 SECONDS FOR LLAMA)
+------------------------------------------------------------------------
+When you test `llama_advisor.py`, you will see TWO stages of output:
+
+  * Stage 1 — `[FAST SENSOR BREAKDOWN]`:
+    Appears INSTANTLY (in ~5 to 35 milliseconds). This gives the fused
+    verdict, confidence score, SMS ML probability, Phishing URL ML
+    verdict, and extracted technical evidence.
+
+  * Stage 2 — `>>> AEGIS Llama Advisory`:
+    Takes APPROXIMATELY 20 TO 30 SECONDS to generate.
+    WHY? Because `Llama-3.2-1B-Instruct` (`model.pte`) runs 100% OFFLINE
+    on your local CPU via Meta's ExecuTorch XNNPACK runtime (generating
+    ~4.3 tokens/sec in the Python wrapper with zero cloud/API calls).
+    Please wait ~25-30 seconds after `"Llama-3.2-1B ExecuTorch generating
+    plain-language advisory..."` appears!
+
+
+3. STEP-BY-STEP SETUP INSTRUCTIONS (WITH OR WITHOUT VENV)
+------------------------------------------------------------------------
+ Step A: Install System Prerequisites (for Scapy / Network Capture)
+  - Ubuntu / Debian / Raspberry Pi OS:
+      sudo apt update
+      sudo apt install python3 python3-venv python3-pip libpcap-dev tcpdump
+  - Fedora Linux:
+      sudo dnf install python3 python3-pip libpcap-devel tcpdump
+  - Windows:
+      Install Python 3 from python.org and Npcap from https://npcap.com/#download
+
+ Step B: Choose Global Python OR Virtual Environment (`venv` is OPTIONAL)
+  * OPTION 1 — Without `venv` (If you already installed packages globally):
+    You do NOT need `venv`! Just open your terminal / PowerShell directly
+    and go to Step C. (Any packages you already installed globally like
+    `optimum-executorch`, `torch`, or `scikit-learn` will be reused automatically!)
+
+  * OPTION 2 — With `venv` (Optional — if you prefer an isolated environment
+    or if Linux blocks global pip installs):
+    - Linux / macOS:
+        python3 -m venv venv
+        source venv/bin/activate
+    - Windows (PowerShell):
+        python -m venv venv
+        .\venv\Scripts\Activate.ps1
+
+ Step C: Install Any Missing Python Libraries
+  From inside `codebase/`, run:
+      pip install -r requirements.txt
+  (If on Linux without `venv` and pip complains about an externally managed
+  environment, run: `pip install --break-system-packages -r requirements.txt`)
+
+  (Note: `requirements.txt` uses `--extra-index-url https://download.pytorch.org/whl/cpu`
+  so `optimum-executorch` and `torch` install the lightweight CPU wheels
+  matching the XNNPACK `.pte` runtime instead of downloading 3+ GB of
+  unused CUDA libraries.)
+
+ Step D: Ensure `model.pte` is Inside `codebase/llama32_1b_instruct/`
+  The offline tokenizer files (`tokenizer.json`, `tokenizer_config.json`,
+  `special_tokens_map.json`) are already included inside
+  `codebase/llama32_1b_instruct/`.
+  - If `model.pte` (1.7 GB) was included in your folder/drive copy,
+    place it at `codebase/llama32_1b_instruct/model.pte`. You are ready!
+  - If `model.pte` was excluded due to file size, generate it once
+    after accepting Meta's license on Hugging Face:
+      huggingface-cli login
+      optimum-cli export executorch \
+        --model "meta-llama/Llama-3.2-1B-Instruct" \
+        --task "text-generation" \
+        --recipe "xnnpack" \
+        --qlinear 8da4w \
+        --output_dir "./llama32_1b_instruct"
+
+
+4. HOW TO RUN & TEST `llama_advisor.py`
+------------------------------------------------------------------------
+Open your terminal (activate `venv` ONLY if you used Option 2 above), then run:
+
+  cd codebase
+  python llama_advisor.py
+
+You can also run the automated 4-case demo mode directly:
+  python llama_advisor.py --demo
+
+--- Copy-Paste Test Cases for Interactive Mode (`Alert/SMS/URL>`) ---
+
+[Test 1: Indian UPI PIN Trap + Phishing URL (Parallel SMS + URL Check)]
+Dear Customer, Rs. 15,500 has been successfully credited to your bank account via PhonePe. Click here to claim your reward and enter UPI PIN to receive the money: http://claim-reward-fake.in
+  -> Expected: Instant CRITICAL_SCAM (100%) in ~30 ms + Llama explanation in ~25-30s.
+
+[Test 2: Fake Telecom SIM KYC Disconnection + Phishing Link]
+Dear Vi User, your SIM card KYC is pending. Your outgoing calls will be stopped at 9:00 PM tonight. Update via Aadhaar link: http://vi-sim-update.com
+  -> Expected: Instant SCAM / PHISHING (100%) + Llama explanation in ~25-30s.
+
+[Test 3: HDFC Credit Card OTP-Sharing Social Engineering Scam]
+URGENT: We detected a suspicious transaction of Rs 49,999 on your HDFC Credit Card. If this was NOT you, please share the 6-digit OTP sent to your phone with our agent to cancel the transaction.
+  -> Expected: Instant CRITICAL_SCAM (98% — catches OTP-sharing trap) + Llama explanation in ~25-30s.
+
+[Test 4: Genuine Bank OTP / UPI Credit Alert (Zero False Alarm Test)]
+Dear Customer, Rs.12,500.00 credited to your A/c No XXXXXX9802 on 11-10-26 by UPI Ref No 628410987654. Available Balance: Rs 84,230.50. Download YONO SBI app for more details. - SBI
+  -> Expected: Instant LEGITIMATE_BANK_ALERT (SAFE) + reassuring Llama advisory in ~25-30s.
+
+[Test 5: Standalone Phishing vs. Legitimate URLs]
+http://google.com.example.test/verify-account
+  -> Expected: PHISHING_URL (100%)
+https://arm-education.github.io/Arm-Developer-Labs/Bharat_AI_SoC_2026_27.html
+  -> Expected: SAFE_URL (80%)
+
+[Test 6: Simulated Network Intrusion Alert (DNS Exfiltration / DGA)]
+net
+  -> Typing `net` feeds a live-formatted `dns_anomaly` JSON alert from
+     `traffic_monitor` into `llama_advisor.py` and explains the attack!
+
+
+5. HOW TO RUN INDIVIDUAL PILLARS STANDALONE (IF NEEDED)
+------------------------------------------------------------------------
+- Phishing URL Scanner only (instant):
+    cd codebase/phishing_detector
+    python evaluate_url.py
+
+- Rebuild Phishing Models from PhishTank + CompPhish datasets:
+    cd codebase/phishing_detector
+    python build_hybrid_engine.py
+
+- SMS Scam Detector only (instant):
+    cd codebase/sms_detector
+    python sms_scam.py
+
+- Network Intrusion Monitor (requires root/Admin for packet sniffing):
+    cd codebase/traffic_monitor
+    # Without venv (Global Python):
+    sudo python3 main.py --ip <YOUR_IP> --iface "<YOUR_IFACE>"
+    # Or on Windows (Admin PowerShell):
+    python main.py --ip <YOUR_IP> --iface "<YOUR_IFACE>"
+    # Or with venv on Linux:
+    sudo ../../venv/bin/python main.py --ip <YOUR_IP> --iface "<YOUR_IFACE>"
+
+
+6. NEXT STEPS TO PICK UP
+------------------------------------------------------------------------
+1. Live Network Alert Watcher:
+   Connect `traffic_monitor/alerts.jsonl` directly to `llama_advisor.py`
+   so any live `nmap` port scan or `test_dns.py` attack automatically
+   triggers `LlamaSecurityAdvisor.analyze_and_explain()`.
+2. Unified Frontend / Dashboard UI:
+   Wrap `LlamaSecurityAdvisor` in a clean local web UI (FastAPI/Flask/
+   Streamlit) showing the instant (<35 ms) sensor breakdown immediately
+   and streaming/displaying the ~25-30s Llama ExecuTorch explanation card.
+3. Edge Hardware Benchmarking (for the PS3 Technical Report):
+   Run `llama_advisor.py --demo` on the target Arm device (e.g.,
+   Raspberry Pi 5) and record the `PyTorchObserver` latency, tokens/sec,
+   and RAM metrics.
+========================================================================

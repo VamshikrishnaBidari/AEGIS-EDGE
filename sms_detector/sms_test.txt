@@ -1,0 +1,61 @@
+=== Scam SMS Detector (type 'quit' to exit) ===
+
+Paste the SMS text: Dear SBI User, your YONO account will be BLOCKED today. Please update your PAN card KYC immediately to avoid suspension. Click link: http://sbi-kyc-update-fake.in
+  Scam probability : 0.879
+  Verdict          : LIKELY SCAM — be careful
+
+Paste the SMS text: Dear Paytm customer, your wallet KYC has expired. Your account will be closed in 24 hrs. Please call customer care executive on 98XXXXXX10 or click http://bit.ly/fake-wallet-kyc
+  Scam probability : 0.907
+  Verdict          : SCAM — do not click links or reply
+
+Paste the SMS text: Dear Vi User, your SIM card KYC is pending. Your outgoing calls will be stopped at 9:00 PM tonight. Update via Aadhaar link: http://vi-sim-update.com/fake
+  Scam probability : 0.802
+  Verdict          : LIKELY SCAM — be careful
+
+Paste the SMS text: Dear Customer, Rs. 15,500 has been successfully credited to your bank account via PhonePe. Click here to claim your reward and enter UPI PIN to receive the money: http://claim-reward-fake.in
+  Scam probability : 0.965
+  Verdict          : SCAM — do not click links or reply
+
+Paste the SMS text: Congratulations! You have won a Jio scratch card of Rs 4,999. Open your GPay app and approve the request from 'CashbackOffers' to get money in your account
+  Scam probability : 0.819
+  Verdict          : LIKELY SCAM — be careful
+
+Paste the SMS text: Dear Consumer, your electricity power will be disconnected tonight at 10.30 PM from the electricity office because your previous month bill was not update. Please contact our electricity officer 82XXXXXX90 immediately
+  Scam probability : 0.345
+  Verdict          : UNCERTAIN — verify with the sender directly
+
+Paste the SMS text: URGENT: We detected a suspicious transaction of Rs 49,999 on your HDFC Credit Card. If this was NOT you, please share the 6-digit OTP sent to your phone with our agent to cancel the transaction.
+  Scam probability : 0.581
+  Verdict          : LIKELY SCAM — be careful
+
+Paste the SMS text: Your Blue Dart package is on hold due to an incomplete delivery address. Please click http://delivery-update-fake.com to update your address and pay a Rs. 5 processing fee using OTP
+  Scam probability : 0.885
+  Verdict          : LIKELY SCAM — be careful
+
+Paste the SMS text: "Dear User, your ICICI netbanking password has been reset successfully. If you did not request this, please forward the OTP 842109 to 99XXXXXX22 to block your account
+  Scam probability : 0.273
+  Verdict          : UNCERTAIN — verify with the sender directly
+
+Paste the SMS text: UPDATE: Rs. 4,500.00 debited from A/c **3841 on 11-10-26 to ZOMATO UPI Ref 628409123456. Not you? Call 18002586161 to block UPI. - HDFC Bank
+  Scam probability : 0.845
+  Verdict          : LIKELY SCAM — be careful
+
+Paste the SMS text: Dear Customer, Rs.12,500.00 credited to your A/c No XXXXXX9802 on 11-10-26 by UPI Ref No 628410987654. Available Balance: Rs 84,230.50. Download YONO SBI app for more details. - SBI
+  Scam probability : 0.716
+  Verdict          : LIKELY SCAM — be careful
+
+Paste the SMS text: 839201 is the OTP for txn of INR 2,499.00 at AMAZON on ICICI Bank Card XX4019. Valid for 5 mins. Do not share OTP with anyone. Bank never calls to verify OTP. - ICICI Bank
+  Scam probability : 0.487
+  Verdict          : UNCERTAIN — verify with the sender directly
+
+Paste the SMS text: 491028 is your OTP to login to Paytm. NEVER share this with anyone, even customer care. Paytm will never call you for this OTP.
+  Scam probability : 0.349
+  Verdict          : UNCERTAIN — verify with the sender directly
+
+Paste the SMS text: Reminder: AutoPay mandate for Rs 999.00 towards NETFLIX on your Kotak Bank A/c **4412 is scheduled for execution on 12-10-26. To modify, login to Kotak Mobile Banking app
+  Scam probability : 0.727
+  Verdict          : LIKELY SCAM — be careful
+
+Paste the SMS text: UPI PIN successfully set for your Axis Bank A/c ending 1234 on PhonePe. If you did not do this, immediately contact your bank to block your account.
+  Scam probability : 0.437
+  Verdict          : UNCERTAIN — verify with the sender directly
