@@ -108,7 +108,7 @@ python llama_advisor.py
 
 ---
 
-## 5. Next Steps for the Team
+## 5. Next Steps:
 See [**`SETUP.md`**](./SETUP.md) for the copy-paste test suite and next modules to pick up:
 1. **Live Network Alert Watcher:** Tail `traffic_monitor/alerts.jsonl` into `llama_advisor.py`.
 2. **Local Web Dashboard UI:** Display the instant (<35 ms) sensor breakdown card immediately while streaming the ~25–30s Llama ExecuTorch explanation.
