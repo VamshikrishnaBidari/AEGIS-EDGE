@@ -51,6 +51,9 @@ codebase/
    pip install -r requirements.txt
    python llama_advisor.py
 
+For exporting the `.pte` model locally, install the required export package:
+   pip install coremltools
+
 ### Option 2: With `venv` (Optional — if you use a virtual environment)
 1. Activate virtual environment and run:
    source venv/bin/activate      # Windows PowerShell: .\venv\Scripts\Activate.ps1
@@ -67,7 +70,7 @@ codebase/
    python aegis_ui.py
 
 ### Benchmark the 8-Bit Quantized Model
-   python benchmark_aegis.py --model-dir "./llama32_1b_instruct" --quant "8da4w / 8w (qembedding)"
+   python benchmark_aegis.py --model-dir ".\llama32_1b_instruct" --quant "8da4w / 8w (qembedding)"
 
 The recorded Jetson benchmark shows sub-5-second Llama generation:
    Average LLM total time: 3.762 seconds

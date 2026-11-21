@@ -82,13 +82,18 @@ For full OS-specific prerequisites and test cases, read [**`SETUP.md`**](./SETUP
   ```
 
 ### Step 2: Obtain or Export `model.pte` (Hugging Face Approval Required Once)
-The quantized `llama32_1b_instruct/model.pte` is large and is ignored by `.gitignore`. The provided export is approximately 915 MB. Either copy `model.pte` and the tokenizer files from a teammate into `codebase/llama32_1b_instruct/`, **or** export it once using Hugging Face:
+The quantized model directory is large and is ignored by `.gitignore`. The provided export is approximately 915 MB. Either copy `model.pte` and the tokenizer files from a teammate into `codebase/llama32_1b_instruct/`, **or** export it once using Hugging Face:
 1. Accept Meta's community license on [**meta-llama/Llama-3.2-1B-Instruct**](https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct).
-2. Generate a **Read** access token at [**huggingface.co/settings/tokens**](https://huggingface.co/settings/tokens) and log in:
+2. Install the export dependency:
+   ```bash
+   pip install coremltools
+   ```
+   This package is also included in `requirements.txt`.
+3. Generate a **Read** access token at [**huggingface.co/settings/tokens**](https://huggingface.co/settings/tokens) and log in:
    ```bash
    huggingface-cli login
    ```
-3. Export the quantized ExecuTorch model into `./llama32_1b_instruct`:
+4. Export the quantized ExecuTorch model into `.\llama32_1b_instruct`:
    ```bash
    optimum-cli export executorch \
      --model "meta-llama/Llama-3.2-1B-Instruct" \
@@ -98,13 +103,14 @@ The quantized `llama32_1b_instruct/model.pte` is large and is ignored by `.gitig
      --use_custom_kv_cache \
      --qlinear 8da4w \
      --qembedding 8w \
-     --output_dir "./llama32_1b_instruct"
+     --output_dir ".\llama32_1b_instruct"
    ```
 
 ### Step 3: Run AEGIS
 ```bash
 # Interactive terminal advisor
 python llama_advisor.py
+python llama_advisor.py --model-dir ".\llama32_1b_instruct"
 
 # Desktop UI
 python aegis_ui.py
@@ -122,13 +128,13 @@ python llama_advisor.py --demo
 Run the local benchmark and save a Notepad-friendly report:
 ```bash
 python benchmark_aegis.py \
-  --model-dir "./llama32_1b_instruct" \
+  --model-dir ".\llama32_1b_instruct" \
   --quant "8da4w / 8w (qembedding)"
 ```
 For a faster report without sustained and offline checks:
 ```bash
 python benchmark_aegis.py \
-  --model-dir "./llama32_1b_instruct" \
+  --model-dir ".\llama32_1b_instruct" \
   --quant "8da4w / 8w (qembedding)" \
   --skip sustained offline
 ```

@@ -11,4 +11,5 @@ scapy>=2.5.0
 psutil>=5.9.0
 huggingface_hub>=1.0.0
 optimum-executorch>=1.1.0
+coremltools
 customtkinter
