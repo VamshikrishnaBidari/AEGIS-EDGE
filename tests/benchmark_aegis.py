@@ -23,8 +23,9 @@ os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-if HERE not in sys.path:
-    sys.path.insert(0, HERE)
+ROOT_DIR = os.path.dirname(HERE)
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
 
 import numpy as np
 import psutil
@@ -261,7 +262,7 @@ def make_table(rows, headers):
 
 def main():
     ap = argparse.ArgumentParser(description="Simple AEGIS benchmark (.txt report)")
-    ap.add_argument("--model-dir", default=os.path.join(HERE, "llama32_1b_instruct"))
+    ap.add_argument("--model-dir", default=os.path.join(ROOT_DIR, "llama32_1b_instruct"))
     ap.add_argument("--quant", default="unknown")
     ap.add_argument("--backend", default="ExecuTorch XNNPACK (CPU)")
     ap.add_argument("--det-iters", type=int, default=20)

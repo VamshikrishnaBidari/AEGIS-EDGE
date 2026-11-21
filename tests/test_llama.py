@@ -1,9 +1,10 @@
 import torch
 from optimum.executorch import ExecuTorchModelForCausalLM
 from transformers import AutoTokenizer
+import os
 
 print("Loading offline quantized model... (this takes a few seconds)")
-model_dir = "./llama32_1b_instruct"
+model_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "llama32_1b_instruct")
 model = ExecuTorchModelForCausalLM.from_pretrained(model_dir)
 tokenizer = AutoTokenizer.from_pretrained(model_dir, local_files_only=True)
 

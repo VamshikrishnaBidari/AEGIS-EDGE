@@ -1,0 +1,83 @@
+============================================================
+AEGIS BENCHMARK SUMMARY (COMPLETE PRODUCT REPORT)
+============================================================
+Timestamp      : 2026-11-21T16:40:06
+Device / CPU   : ARMv8 Processor rev 1 (v8l) (6P/6L cores)
+OS / Arch      : Linux-5.15.148-tegra-aarch64-with-glibc2.35 (aarch64)
+Python         : 3.10.12
+RAM Total      : 7.44 GB
+Backend / Quant: ExecuTorch XNNPACK (CPU) | 8da4w / 8w (qembedding)
+Model Dir / PTE: /home/ubuntu/aegis_edge/llama32_1b_instruct | ['model.pte']
+Packages       : {'torch': '2.14.1+cpu', 'executorch': '1.5.1+cpu', 'optimum-executorch': '1.1.0', 'transformers': '5.0.0rc1', 'scikit-learn': '1.7.2', 'psutil': '7.2.2'}
+
+--- OVERALL AVERAGES (ACROSS ALL 6 TEST CASES) ---
+Avg detection latency  : 56.75 ms
+Avg LLM TTFT           : 1847.7 ms
+Avg LLM total time     : 3758.7 ms
+Avg LLM throughput     : 13.1 tok/s (end-to-end, includes prefill)
+Avg LLM decode speed   : 25.73 tok/s (excludes prefill/TTFT)
+Offline pass rate      : 6/6 passed
+
+--- MEMORY & MODEL SIZE ---
+Advisor load time      : 17.51 s
+LLM directory size     : 923.1 MB
+Detector artefacts     : {'sms/scam_model.joblib': '4.43 MB', 'phishing/bloom_filter.bin': '0.21 MB', 'phishing/phishing_rf_model.joblib': '5.72 MB'}
+RSS before import      : 27.5 MB
+RSS after import       : 508.1 MB
+RSS after model load   : 2791.0 MB
+Observed peak RSS      : 2982.6 MB (OS lifetime peak: 2987.3 MB)
+
+--- PER-CASE SUMMARY TABLE ---
++-----------------------+----------+---------------------------------+--------------+-----------+----------------+------------+-------+---------+
+| Test Case             | Expected | Verdict                         | Det Med (ms) | TTFT (ms) | LLM Total (ms) | Gen Tokens | Tok/s | Offline |
++-----------------------+----------+---------------------------------+--------------+-----------+----------------+------------+-------+---------+
+| otp_trap_short        | True     | CRITICAL_SCAM                   | 11.42        | 1824.2    | 3914.8         | 54.0       | 13.79 | PASS    |
+| otp_trap_long         | True     | CRITICAL_SCAM                   | 12.18        | 1869.5    | 3921.2         | 52.0       | 13.26 | PASS    |
+| upi_pin_trap_with_url | True     | CRITICAL_SCAM                   | 153.16       | 1983.4    | 3737.3         | 45.0       | 12.04 | PASS    |
+| legit_bank_otp        | False    | LEGITIMATE_BANK_ALERT (SAFE)    | 12.48        | 2046.1    | 3822.0         | 46.0       | 12.04 | PASS    |
+| pure_url              | None     | PHISHING_URL                    | 151.25       | 1509.8    | 3450.7         | 51.0       | 14.78 | PASS    |
+| network_alert         | True     | NETWORK_INTRUSION (DNS_ANOMALY) | 0.03         | 1853.3    | 3705.9         | 47.0       | 12.68 | PASS    |
++-----------------------+----------+---------------------------------+--------------+-----------+----------------+------------+-------+---------+
+
+--- 1. DETECTION LATENCY DETAILS ---
+* otp_trap_short: median=11.42 ms, p95=12.59 ms, verdict=CRITICAL_SCAM
+* otp_trap_long: median=12.18 ms, p95=12.91 ms, verdict=CRITICAL_SCAM
+* upi_pin_trap_with_url: median=153.16 ms, p95=164.0 ms, verdict=CRITICAL_SCAM
+* legit_bank_otp: median=12.48 ms, p95=13.16 ms, verdict=LEGITIMATE_BANK_ALERT (SAFE)
+* pure_url: median=151.25 ms, p95=156.02 ms, verdict=PHISHING_URL
+* network_alert: median=0.03 ms, p95=0.04 ms, verdict=NETWORK_INTRUSION (DNS_ANOMALY)
+
+--- 2. LLM RESPONSE DETAILS ---
+* otp_trap_short: TTFT=1824.2 ms, total=3914.8 ms, tokens=54.0, speed=13.79 tok/s (end-to-end), decode-only=25.83 tok/s
+* otp_trap_long: TTFT=1869.5 ms, total=3921.2 ms, tokens=52.0, speed=13.26 tok/s (end-to-end), decode-only=25.35 tok/s
+* upi_pin_trap_with_url: TTFT=1983.4 ms, total=3737.3 ms, tokens=45.0, speed=12.04 tok/s (end-to-end), decode-only=25.67 tok/s
+* legit_bank_otp: TTFT=2046.1 ms, total=3822.0 ms, tokens=46.0, speed=12.04 tok/s (end-to-end), decode-only=25.9 tok/s
+* pure_url: TTFT=1509.8 ms, total=3450.7 ms, tokens=51.0, speed=14.78 tok/s (end-to-end), decode-only=26.28 tok/s
+* network_alert: TTFT=1853.3 ms, total=3705.9 ms, tokens=47.0, speed=12.68 tok/s (end-to-end), decode-only=25.37 tok/s
+
+--- 3. SUSTAINED OPERATION ---
+* Duration: 122.7s | Iterations: 32 | Errors: 0
+* Avg throughput: 13.1 tok/s | Throughput drift: 13.16 -> 13.23 tok/s (+0.5%)
+* Avg system CPU: 87.1% | End RSS: 2890.0 MB
+* Temperature: start=52.7 C, max=54.5 C | Throttling status: freq_ratio=0.94 (1267/1344 MHz)
+
+--- 4. OFFLINE TEST ---
+* All cases passed offline: True (6/6)
+* Blocked network attempts: 0 -> []
+
+--- 5. MEASUREMENT METHOD ---
+* Detection latency: Wall-clock time of FastThreatSensors.analyze_input() via perf_counter_ns (warm-up excluded).
+* LLM response: Wall-clock time of model.text_generation(); TTFT = 1-token generation.
+* LLM total time: Full wall-clock time of text_generation() for up to max-new-tokens (prefill + decode), averaged over reps.
+* Tok/s (end-to-end): generated tokens / total seconds. Decode-only tok/s: generated tokens / (total seconds - TTFT).
+* Memory & size: Process VmRSS/working set via psutil plus OS lifetime peak (peak_wset/VmHWM) and on-disk model folder size.
+* Sustained operation: Continuous detection + LLM loop over configured duration while sampling CPU %, temp, frequency/throttling, and throughput drift.
+* Offline reliability: Socket connect() and DNS getaddrinfo() patched to block all non-loopback network traffic during execution.
+
+--- 6. TEST INPUTS USED ---
+* otp_trap_short: URGENT: Suspicious txn of Rs 49,999 on HDFC Card. Share 6-digit OTP to cancel.
+* otp_trap_long: URGENT: We detected a suspicious transaction of Rs 49,999 on your HDFC Credit Card. If this was NOT you, please share the 6-digit OTP sent to your phone with our agent to cancel the transaction.
+* upi_pin_trap_with_url: Dear Customer, Rs. 15,500 has been successfully credited to your bank account via PhonePe. Click here to claim your reward and enter UPI PIN to receive the money: http://claim-reward-fake.in
+* legit_bank_otp: 839201 is the OTP for txn of INR 2,499.00 at AMAZON on ICICI Bank Card XX4019. Valid for 5 mins. Do not share OTP with anyone. Bank never calls to verify OTP. - ICICI Bank
+* pure_url: http://secure-login.verify-account-update.xyz/kyc
+* network_alert: {"id": "NET-0001", "channel": "network", "type": "dns_anomaly", "severity": "high", "source": "192.168.43.50", "target": "8.8.8.8", "summary": "This device's dns_max_entropy jumped to 4.35 across 80 rapid queries (normal baseline is 2.8) \u2014 indicative of DNS Exfiltration or DGA malware.", "reasons": [{"feature": "dns_max_entropy", "value": 4.35, "baseline_median": 2.8, "z": 8.4}, {"feature": "dns_queries", "value": 80, "baseline_median": 6, "z": 7.4}]}

@@ -56,6 +56,13 @@ If you prefer an isolated environment (or are on Fedora/Ubuntu where `venv` is s
 > **Why `requirements.txt` is fast and lightweight:**  
 > It includes `--extra-index-url https://download.pytorch.org/whl/cpu` at the top so `pip` pulls the lightweight CPU wheels for `torch` and `optimum-executorch` (matching our XNNPACK `.pte` runtime) instead of downloading 3+ GB of unused NVIDIA CUDA libraries.
 
+### Jetson Nano Reproducible Environment
+For the pinned Jetson Nano environment used for benchmarking, install the Jetson lock file:
+```bash
+pip install -r requirements-lock.txt
+```
+`requirements-lock.txt` is a full environment snapshot, not a portable cross-platform dependency list. It contains Jetson/Ubuntu-specific packages and system generated local wheel references, so it may not install unchanged on Raspberry Pi, Windows, or a desktop Linux machine. Use `requirements.txt` for normal setup and the lock file when reproducing the recorded Jetson Nano environment.
+
 ---
 
 ## 3. Getting `model.pte` (Hugging Face Approval & ExecuTorch Export)
@@ -124,6 +131,11 @@ cd codebase
 python llama_advisor.py --demo
 ```
 
+### Run the Standalone Llama Test
+```bash
+python tests/test_llama.py
+```
+
 ### Run the Desktop UI
 ```bash
 cd codebase
@@ -134,11 +146,11 @@ The UI provides a Live Monitor tab with CPU/RAM/network telemetry and a Scam Sim
 ### Run the ARM/Edge Benchmark
 ```bash
 cd codebase
-python benchmark_aegis.py \
+python tests/benchmark_aegis.py \
   --model-dir ".\llama32_1b_instruct" \
   --quant "8da4w / 8w (qembedding)"
 ```
-The benchmark writes a timestamped `benchmark_summary_*.txt` report unless `--out-file` is supplied. Use `--skip sustained` for a faster run, or `--skip sustained offline` for only detection and LLM measurements.
+The benchmark writes a timestamped `benchmark_summary_*.txt` report under `tests/` unless `--out-file` is supplied. Use `--skip sustained` for a faster run, or `--skip sustained offline` for only detection and LLM measurements.
 
 ---
 
@@ -212,6 +224,11 @@ If you want to test or develop any of the 3 sensor modules independently without
      ```bash
      cd codebase/traffic_monitor
      sudo python3 main.py --ip <YOUR_IPV4> --iface "<YOUR_INTERFACE>"
+     ```
+     If monitoring with a Linux virtual environment, use the environment's Python executable:
+     ```bash
+     cd codebase/traffic_monitor
+     sudo ../../venv/bin/python main.py --ip <YOUR_IPV4> --iface "<YOUR_INTERFACE>"
      ```
    * Once `baseline ready` appears, simulate a DNS exfiltration attack from another terminal:
      ```bash

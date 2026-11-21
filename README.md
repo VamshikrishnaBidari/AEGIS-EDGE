@@ -2,6 +2,8 @@
 **ARM Bharat AI-SoC Challenge 2026–27 | Problem Statement 3**
 
 > **Full Setup, Hugging Face Model Access & Testing Instructions:** See [**`SETUP.md`**](./SETUP.md)
+>
+> Markdown documentation is authoritative. Legacy `.txt` documentation is retained only for backup and will not be maintained.
 
 ---
 
@@ -50,11 +52,13 @@ codebase/
 ├── SETUP.md                        # Complete setup, Hugging Face export & test guide
 ├── .gitignore                      # Excludes the large model.pte, venv/, and logs from Git
 ├── requirements.txt                # CPU-optimized Python dependencies
+├── requirements-lock.txt           # Jetson Nano pinned environment snapshot
 ├── llama_advisor.py                # MAIN 4-PILLAR COORDINATOR (SMS + URL + Network + Llama)
 ├── aegis_ui.py                     # CustomTkinter desktop UI with Live Monitor & Scam Simulator
-├── benchmark_aegis.py              # ARM/CPU benchmarking and Notepad-friendly text report
-├── jetson_benchmark_results_001.txt # Recorded Jetson benchmark results
-├── test_llama.py                   # Standalone Llama-3.2-1B ExecuTorch chat script
+├── tests/
+│   ├── benchmark_aegis.py          # ARM/CPU benchmarking and Notepad-friendly text report
+│   ├── jetson_benchmark_results_001.txt # Recorded Jetson benchmark results
+│   └── test_llama.py               # Standalone Llama-3.2-1B ExecuTorch chat script
 ├── llama32_1b_instruct/            # Offline tokenizer files + model.pte (generated locally)
 ├── phishing_detector/              # Bloom Filter + CompPhish/PhishTank Random Forest engine
 ├── sms_detector/                   # Soft-voting SMS Scam classifier + Indian SMS test suite
@@ -80,6 +84,11 @@ For full OS-specific prerequisites and test cases, read [**`SETUP.md`**](./SETUP
   cd codebase
   pip install -r requirements.txt
   ```
+* **Jetson Nano pinned environment:**
+  ```bash
+  pip install -r requirements-lock.txt
+  ```
+  Use the lock file to reproduce the Jetson Nano benchmark environment. It is an environment snapshot and may include Jetson/Ubuntu-specific packages; use `requirements.txt` for normal setup on other devices.
 
 ### Step 2: Obtain or Export `model.pte` (Hugging Face Approval Required Once)
 The quantized model directory is large and is ignored by `.gitignore`. The provided export is approximately 915 MB. Either copy `model.pte` and the tokenizer files from a teammate into `codebase/llama32_1b_instruct/`, **or** export it once using Hugging Face:
@@ -127,18 +136,18 @@ python llama_advisor.py --demo
 ### Benchmark
 Run the local benchmark and save a Notepad-friendly report:
 ```bash
-python benchmark_aegis.py \
+python tests/benchmark_aegis.py \
   --model-dir ".\llama32_1b_instruct" \
   --quant "8da4w / 8w (qembedding)"
 ```
 For a faster report without sustained and offline checks:
 ```bash
-python benchmark_aegis.py \
+python tests/benchmark_aegis.py \
   --model-dir ".\llama32_1b_instruct" \
   --quant "8da4w / 8w (qembedding)" \
   --skip sustained offline
 ```
-The recorded results are in [`jetson_benchmark_results_001.txt`](./jetson_benchmark_results_001.txt): 3.762 s average LLM total time, 13.08 end-to-end tok/s, 923.1 MB model directory, and 6.79 s model/advisor load time.
+The recorded results are in [`tests/jetson_benchmark_results_001.txt`](./tests/jetson_benchmark_results_001.txt): 3.762 s average LLM total time, 13.08 end-to-end tok/s, 923.1 MB model directory, and 6.79 s model/advisor load time.
 
 ---
 
@@ -146,4 +155,4 @@ The recorded results are in [`jetson_benchmark_results_001.txt`](./jetson_benchm
 See [**`SETUP.md`**](./SETUP.md) for the copy-paste test suite and setup details:
 1. **Live Network Alert Watcher:** Tail `traffic_monitor/alerts.jsonl` into `llama_advisor.py`.
 2. **Desktop UI:** Run `aegis_ui.py` for the Live Monitor and Scam Simulator.
-3. **Arm SoC Benchmarking:** Use `benchmark_aegis.py` to record latency, throughput, memory, sustained operation, and offline reliability.
+3. **Arm SoC Benchmarking:** Use `tests/benchmark_aegis.py` to record latency, throughput, memory, sustained operation, and offline reliability.
