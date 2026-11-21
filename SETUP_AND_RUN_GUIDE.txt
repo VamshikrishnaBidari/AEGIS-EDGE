@@ -38,7 +38,7 @@ Everything is unified inside the `codebase/` folder:
        a plain-English explanation and 2 safety actions 100% offline.
 
 
-2. IMPORTANT NOTE ON RESPONSE TIMING (~30 SECONDS FOR LLAMA)
+2. IMPORTANT NOTE ON RESPONSE TIMING (SUB-5 SECONDS FOR LLAMA)
 ------------------------------------------------------------------------
 When you test `llama_advisor.py`, you will see TWO stages of output:
 
@@ -48,12 +48,11 @@ When you test `llama_advisor.py`, you will see TWO stages of output:
     verdict, and extracted technical evidence.
 
   * Stage 2 — `>>> AEGIS Llama Advisory`:
-    Takes APPROXIMATELY 20 TO 30 SECONDS to generate.
-    WHY? Because `Llama-3.2-1B-Instruct` (`model.pte`) runs 100% OFFLINE
-    on your local CPU via Meta's ExecuTorch XNNPACK runtime (generating
-    ~4.3 tokens/sec in the Python wrapper with zero cloud/API calls).
-    Please wait ~25-30 seconds after `"Llama-3.2-1B ExecuTorch generating
-    plain-language advisory..."` appears!
+    Takes approximately 3.5 to 4.0 SECONDS on the recorded ARM device.
+    `Llama-3.2-1B-Instruct` (`model.pte`) runs 100% OFFLINE on the local
+    CPU via Meta's ExecuTorch XNNPACK runtime. The 8-bit quantized export
+    averaged 13.08 end-to-end tokens/sec in the benchmark with zero
+    cloud/API calls.
 
 
 3. STEP-BY-STEP SETUP INSTRUCTIONS (WITH OR WITHOUT VENV)
@@ -97,7 +96,8 @@ When you test `llama_advisor.py`, you will see TWO stages of output:
   The offline tokenizer files (`tokenizer.json`, `tokenizer_config.json`,
   `special_tokens_map.json`) are already included inside
   `codebase/llama32_1b_instruct/`.
-  - If `model.pte` (1.7 GB) was included in your folder/drive copy,
+  - If `model.pte` (about 915 MB in the quantized export) was included in
+    your folder/drive copy,
     place it at `codebase/llama32_1b_instruct/model.pte`. You are ready!
   - If `model.pte` was excluded due to file size, generate it once
     after accepting Meta's license on Hugging Face:
@@ -106,7 +106,10 @@ When you test `llama_advisor.py`, you will see TWO stages of output:
         --model "meta-llama/Llama-3.2-1B-Instruct" \
         --task "text-generation" \
         --recipe "xnnpack" \
+        --use_custom_sdpa \
+        --use_custom_kv_cache \
         --qlinear 8da4w \
+        --qembedding 8w \
         --output_dir "./llama32_1b_instruct"
 
 
@@ -120,23 +123,32 @@ Open your terminal (activate `venv` ONLY if you used Option 2 above), then run:
 You can also run the automated 4-case demo mode directly:
   python llama_advisor.py --demo
 
+To run the desktop UI:
+  python aegis_ui.py
+
+To run the benchmark and save a text report:
+  python benchmark_aegis.py \
+    --model-dir "./llama32_1b_instruct" \
+    --quant "8da4w / 8w (qembedding)"
+  Recorded results: jetson_benchmark_results_001.txt
+
 --- Copy-Paste Test Cases for Interactive Mode (`Alert/SMS/URL>`) ---
 
 [Test 1: Indian UPI PIN Trap + Phishing URL (Parallel SMS + URL Check)]
 Dear Customer, Rs. 15,500 has been successfully credited to your bank account via PhonePe. Click here to claim your reward and enter UPI PIN to receive the money: http://claim-reward-fake.in
-  -> Expected: Instant CRITICAL_SCAM (100%) in ~30 ms + Llama explanation in ~25-30s.
+  -> Expected: Instant CRITICAL_SCAM (100%) in ~30 ms + Llama explanation in ~3.5-4.0s.
 
 [Test 2: Fake Telecom SIM KYC Disconnection + Phishing Link]
 Dear Vi User, your SIM card KYC is pending. Your outgoing calls will be stopped at 9:00 PM tonight. Update via Aadhaar link: http://vi-sim-update.com
-  -> Expected: Instant SCAM / PHISHING (100%) + Llama explanation in ~25-30s.
+  -> Expected: Instant SCAM / PHISHING (100%) + Llama explanation in ~3.5-4.0s.
 
 [Test 3: HDFC Credit Card OTP-Sharing Social Engineering Scam]
 URGENT: We detected a suspicious transaction of Rs 49,999 on your HDFC Credit Card. If this was NOT you, please share the 6-digit OTP sent to your phone with our agent to cancel the transaction.
-  -> Expected: Instant CRITICAL_SCAM (98% — catches OTP-sharing trap) + Llama explanation in ~25-30s.
+  -> Expected: Instant CRITICAL_SCAM (98% — catches OTP-sharing trap) + Llama explanation in ~3.5-4.0s.
 
 [Test 4: Genuine Bank OTP / UPI Credit Alert (Zero False Alarm Test)]
 Dear Customer, Rs.12,500.00 credited to your A/c No XXXXXX9802 on 11-10-26 by UPI Ref No 628410987654. Available Balance: Rs 84,230.50. Download YONO SBI app for more details. - SBI
-  -> Expected: Instant LEGITIMATE_BANK_ALERT (SAFE) + reassuring Llama advisory in ~25-30s.
+  -> Expected: Instant LEGITIMATE_BANK_ALERT (SAFE) + reassuring Llama advisory in ~3.5-4.0s.
 
 [Test 5: Standalone Phishing vs. Legitimate URLs]
 http://google.com.example.test/verify-account
@@ -180,10 +192,9 @@ net
    Connect `traffic_monitor/alerts.jsonl` directly to `llama_advisor.py`
    so any live `nmap` port scan or `test_dns.py` attack automatically
    triggers `LlamaSecurityAdvisor.analyze_and_explain()`.
-2. Unified Frontend / Dashboard UI:
-   Wrap `LlamaSecurityAdvisor` in a clean local web UI (FastAPI/Flask/
-   Streamlit) showing the instant (<35 ms) sensor breakdown immediately
-   and streaming/displaying the ~25-30s Llama ExecuTorch explanation card.
+2. Desktop Frontend / Dashboard UI:
+   Run `aegis_ui.py` for the Local CustomTkinter Live Monitor and Scam
+   Simulator with the instant sensor breakdown and sub-5-second advisory.
 3. Edge Hardware Benchmarking (for the PS3 Technical Report):
    Run `llama_advisor.py --demo` on the target Arm device (e.g.,
    Raspberry Pi 5) and record the `PyTorchObserver` latency, tokens/sec,

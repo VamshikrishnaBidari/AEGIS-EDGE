@@ -4,9 +4,12 @@ All 4 pillars of the on-device AI cybersecurity assistant and their datasets/mod
 
 codebase/
 ├── llama_advisor.py              # MAIN 4-PILLAR ENTRY POINT (SMS ML + URL Phishing ML + Network + Llama ExecuTorch)
+├── aegis_ui.py                   # Desktop UI: Live Monitor + Scam Simulator
+├── benchmark_aegis.py            # ARM/CPU benchmark report generator
+├── jetson_benchmark_results_001.txt # Recorded benchmark report
 ├── test_llama.py                 # Standalone Llama-3.2-1B ExecuTorch chat test
 ├── llama32_1b_instruct/          # Pillar 4: Offline Meta Llama-3.2-1B-Instruct (ExecuTorch XNNPACK)
-│   ├── model.pte                 # Quantized 4-bit ExecuTorch model binary
+│   ├── model.pte                 # 8da4w / 8w quantized ExecuTorch model binary
 │   ├── tokenizer.json            # Offline tokenizer vocabulary & merges
 │   ├── tokenizer_config.json     # Offline tokenizer chat template config
 │   └── special_tokens_map.json   # Special tokens map
@@ -59,3 +62,15 @@ codebase/
    - Phishing URL Scanner : cd phishing_detector && python evaluate_url.py
    - SMS Scam Detector    : cd sms_detector && python sms_scam.py
    - Network Monitor      : cd traffic_monitor && python main.py --ip <IP> --iface "<IFACE>" (run as Admin/sudo)
+
+### Run the Desktop UI
+   python aegis_ui.py
+
+### Benchmark the 8-Bit Quantized Model
+   python benchmark_aegis.py --model-dir "./llama32_1b_instruct" --quant "8da4w / 8w (qembedding)"
+
+The recorded Jetson benchmark shows sub-5-second Llama generation:
+   Average LLM total time: 3.762 seconds
+   End-to-end throughput: 13.08 tokens/sec
+   Model/advisor load time: 6.79 seconds
+   Model directory: 923.1 MB

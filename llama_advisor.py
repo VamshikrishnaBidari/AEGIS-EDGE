@@ -3,7 +3,7 @@ llama_advisor.py
 
 AEGIS EDGE — Unified 4-Pillar On-Device Cybersecurity Assistant (PS3)
   Pillar 1: Network Intrusion Monitor (traffic_monitor alerts / JSONL logs)
-  Pillar 2: SMS Scam Ensemble Classifier (workspace_temp/sms_scam.py — unmodified)
+  Pillar 2: SMS Scam Ensemble Classifier (sms_detector/sms_scam.py — unmodified)
   Pillar 3: Hybrid Phishing URL Detector (Bloom Filter + Random Forest — unmodified)
   Pillar 4: Offline Meta Llama-3.2-1B-Instruct via ExecuTorch (XNNPACK CPU)
 
@@ -12,7 +12,7 @@ When given an SMS, URL, or Network Alert:
   2. Applies Indian Banking/UPI/OTP domain-specific evidence analysis.
   3. Immediately prints the Fast Sensor Verdict & Evidence Breakdown.
   4. Feeds the structured, verdict-aware evidence to Llama-3.2-1B (ExecuTorch)
-     to generate a plain-language explanation and remediation steps completely offline.
+     to generate a plain-language explanation completely offline.
 """
 
 import argparse
@@ -42,10 +42,22 @@ SMS_DIR = os.path.join(ROOT_DIR, "sms_detector")
 PHISHING_DIR = os.path.join(ROOT_DIR, "phishing_detector")
 DEFAULT_MODEL_DIR = os.path.join(ROOT_DIR, "llama32_1b_instruct")
 
+# Fail loudly (and clearly) if a required folder was not copied to this machine.
+for _d in (SMS_DIR, PHISHING_DIR):
+    if not os.path.isdir(_d):
+        raise FileNotFoundError(f"[AEGIS] Required folder not found: {_d} (copy it next to llama_advisor.py)")
+
 if PHISHING_DIR not in sys.path:
     sys.path.insert(0, PHISHING_DIR)
 if SMS_DIR not in sys.path:
     sys.path.insert(0, SMS_DIR)
+
+# Offline safety: use tldextract's bundled suffix list instead of trying to download it
+# (must run BEFORE sms_scam / evaluate_url are imported).
+try:
+    tldextract.extract = tldextract.TLDExtract(suffix_list_urls=())
+except Exception:
+    pass
 
 import sms_scam  # noqa: E402  (imported unmodified)
 import evaluate_url as phishing_eval  # noqa: E402  (uses CompPhish + PhishTank Hybrid Engine)
@@ -136,8 +148,11 @@ class FastThreatSensors:
         action_code = "WARN_USER"
 
         # 1. OTP Social-Engineering Trap (asking user to share/forward/send OTP, excluding "do not share" / "never share")
+        #    Matches e.g. "Share 6-digit OTP to cancel", "Please share the OTP with our agent", "Send your OTP to 98xxxxxxx".
         otp_share_pattern = re.search(
-            r"(?<!do not )(?<!never )(?<!not )\b(please\s+(share|forward|send|give)|(share|forward|send)\s+the\s+(\d+-digit\s+)?otp)\b.{0,60}\b(with\s+our\s+agent|to\s+\d|to\s+cancel|to\s+block)",
+            r"(?<!do not )(?<!never )(?<!not )\b(?:please\s+)?(?:share|forward|send|give|provide|tell|reply\s+with)\b"
+            r"(?:\s+\w+){0,3}?\s+(?:\d+[- ]?digit\s+)?(?:otp|one[- ]time\s+password|cvv|card\s+pin)\b"
+            r".{0,80}?\b(?:with\s+(?:our\s+)?(?:agent|executive|us)|to\s+\d|to\s+(?:cancel|block|stop|reverse|verify|confirm|avoid|secure|unblock)|immediately|now)\b",
             t_low,
         )
         if otp_share_pattern:
@@ -161,7 +176,7 @@ class FastThreatSensors:
 
         # 3. Urgent KYC / SIM / Electricity / Delivery Suspension Coercion
         coercion_match = re.search(
-            r"(kyc\s+(is\s+pending|has\s+expired|immediately)|account\s+will\s+be\s+(blocked|closed|suspended)|electricity\s+power\s+will\s+be\s+disconnected|outgoing\s+calls\s+will\s+be\s+stopped|package\s+is\s+on\s+hold)",
+            r"(kyc\s+(is\s+)?(pending|expired)|kyc\s+has\s+expired|kyc\s+immediately|account\s+will\s+be\s+(blocked|closed|suspended)|electricity\s+power\s+will\s+be\s+disconnected|outgoing\s+calls\s+will\s+be\s+stopped|calls\s+(will\s+)?stop|package\s+is\s+on\s+hold)",
             t_low,
         )
         if coercion_match:
@@ -261,6 +276,7 @@ class FastThreatSensors:
 
         indian_ctx = self.analyze_indian_context(stripped, urls)
         any_phish_url = any(r["verdict"] == "PHISHING" for r in url_results)
+        text_low = stripped.lower()
 
         evidence: List[str] = []
         # Fuse verdicts across SMS ML + Phishing URL Engine + Indian Context Rules
@@ -290,6 +306,22 @@ class FastThreatSensors:
                 if r["verdict"] == "PHISHING":
                     evidence.extend(r["evidence"])
             action_code = "BLOCK_DOMAIN & WARN_USER" if any_phish_url else indian_ctx["action_code"]
+        elif (
+            re.search(r"\b(otp|pin|cvv|password)\b", text_low)
+            and re.search(r"\b(share|send|give|provide|reply|forward|tell|submit)\b", text_low)
+            and re.search(r"\b(urgent|immediately|suspicious|blocked|suspend\w*)\b", text_low)
+            and not re.search(r"(do not|don't|never)\s+(share|disclose|give|reveal)", text_low)
+        ):
+            # Safety net: the UK-trained ML model can miss Indian OTP scams; never label these plainly "safe".
+            is_threat = True
+            final_verdict = "SUSPICIOUS_SMS (OTP + URGENCY)"
+            severity = "HIGH"
+            confidence = "75% (Rule-based)"
+            evidence.append(
+                "The message mentions an OTP/PIN/CVV together with a request to share it and urgent wording. Genuine banks never ask you to hand over an OTP."
+            )
+            evidence.append(f"SMS ML Classifier score: {sms_prob:.3f} ({sms_verdict}).")
+            action_code = "NEVER_SHARE_OTP"
         else:
             is_threat = False
             final_verdict = "LEGITIMATE_SMS (SAFE)"
@@ -351,20 +383,25 @@ class FastThreatSensors:
 # =====================================================================
 # PILLAR 4: OFFLINE LLAMA-3.2-1B EXECUTORCH REASONING ENGINE
 # =====================================================================
+# Lean prompts: Llama only writes the 2-sentence "why". The actionable steps are shown
+# separately by the UI from a fixed, reliable table (USER_FRIENDLY_ACTIONS).
 
 THREAT_SYSTEM_PROMPT = (
-    "You are AEGIS, a helpful defensive cybersecurity educator. "
-    "An automated security sensor flagged a dangerous scam or network attack and produced a technical report. "
-    "Keep your response under 65 words total: write 2 short sentences in plain English explaining why "
-    "this is dangerous using ONLY the sensor report, followed by 2 short bullet-point safety actions."
+    "You are AEGIS, a cybersecurity helper. Using only the findings given, explain in exactly "
+    "2 short plain-English sentences (under 40 words) why this is dangerous. No lists, no advice."
 )
 
 SAFE_URL_SYSTEM_PROMPT = (
-    "You are AEGIS, a helpful cybersecurity assistant. "
-    "An automated URL security scanner verified that this website URL is SAFE and LEGITIMATE (NOT phishing). "
-    "Keep your response under 50 words total: write 2 short sentences reassuring the user why the URL passed security checks, "
-    "followed by 2 short general safe-browsing bullet points."
+    "You are AEGIS, a cybersecurity helper. The URL scanner verified this website is SAFE (not phishing). "
+    "In exactly 2 short plain-English sentences (under 35 words), tell the user why it passed. No lists."
 )
+
+SAFE_BANK_SYSTEM_PROMPT = (
+    "You are AEGIS, a cybersecurity helper. A security filter verified this is a GENUINE notification (not a scam). "
+    "In exactly 2 short plain-English sentences (under 35 words), explain what this alert means. No lists."
+)
+
+DEFAULT_MAX_NEW_TOKENS = 60
 
 
 class LlamaSecurityAdvisor:
@@ -381,6 +418,23 @@ class LlamaSecurityAdvisor:
         self.tokenizer = AutoTokenizer.from_pretrained(model_dir, local_files_only=True)
         self.load_time_s = round(time.perf_counter() - t0, 2)
         print(f"[AEGIS] Llama-3.2-1B ExecuTorch ready in {self.load_time_s}s (100% offline mode).")
+
+        # Warm-up: one throwaway generation so the first real request isn't a cold start
+        try:
+            t_w = time.perf_counter()
+            warm_prompt = self.tokenizer.apply_chat_template(
+                [{"role": "user", "content": "Say hi."}],
+                tokenize=False,
+                add_generation_prompt=True,
+            )
+            self.model.text_generation(
+                tokenizer=self.tokenizer,
+                prompt=warm_prompt,
+                max_seq_len=len(self.tokenizer.encode(warm_prompt)) + 16,
+            )
+            print(f"[AEGIS] Warm-up done in {round(time.perf_counter() - t_w, 2)}s.")
+        except Exception as exc:
+            print(f"[AEGIS] Warm-up skipped: {exc}")
 
     @staticmethod
     def _clean_response(raw_output: str) -> str:
@@ -401,60 +455,37 @@ class LlamaSecurityAdvisor:
         return cleaned
 
     def build_prompt_messages(self, report: Dict[str, Any]) -> List[Dict[str, str]]:
-        evidence_bullets = "\n".join(f"- {item}" for item in report.get("evidence", []))
+        # Keep only the two most important findings, truncated, to keep prefill fast.
+        findings = "\n".join(f"- {item[:160]}" for item in report.get("evidence", [])[:2])
         is_threat = report.get("is_threat", True)
         # Mask raw 6-digit OTPs/ref numbers before sending to the 1B LLM for privacy & to avoid false financial refusals
         sanitized_source = re.sub(r"\b\d{6}\b", "[6-DIGIT-OTP]", report.get("source", ""))
 
         if is_threat:
+            system_prompt = THREAT_SYSTEM_PROMPT
             user_msg = (
-                f"Translate this confirmed security threat report into simple English for a non-expert user:\n"
-                f"- Channel: {report['channel'].upper()}\n"
-                f"- Verdict: {report['verdict']} (Confidence: {report['confidence']})\n"
-                f"- Content: {sanitized_source}\n"
-                f"- Key Findings:\n{evidence_bullets}\n"
-                f"- Recommended Action: {report['recommended_action']}\n\n"
-                f"Write:\n1) Why This Is Dangerous (2 plain sentences based on Key Findings)\n"
-                f"2) Safe Next Steps (2 short bullet points)"
+                f"Verdict: {report['verdict']}\n"
+                f"Message: {sanitized_source}\n"
+                f"Findings:\n{findings}"
             )
-            return [
-                {"role": "system", "content": THREAT_SYSTEM_PROMPT},
-                {"role": "user", "content": user_msg},
-            ]
         elif report.get("channel") == "phishing_url":
+            system_prompt = SAFE_URL_SYSTEM_PROMPT
             user_msg = (
-                f"Translate this verified safe URL scan report into simple English for the user:\n"
-                f"- Verdict: {report['verdict']} (Confidence: {report['confidence']})\n"
-                f"- Scanned URL: {sanitized_source}\n"
-                f"- Verification Notes:\n{evidence_bullets}\n\n"
-                f"Write:\n1) Why This Link Is Safe (2 plain reassuring sentences)\n"
-                f"2) Routine Safe-Browsing Tips (2 short bullet points)"
+                f"URL: {sanitized_source}\n"
+                f"Notes:\n{findings}"
             )
-            return [
-                {"role": "system", "content": SAFE_URL_SYSTEM_PROMPT},
-                {"role": "user", "content": user_msg},
-            ]
         else:
-            safe_bank_prompt = (
-                "You are AEGIS, a helpful cybersecurity educator. "
-                "An automated security filter verified that this message is a LEGITIMATE bank security notification (NOT a scam). "
-                "Keep your response under 60 words total: write 2 short sentences reassuring the user what this genuine alert means, "
-                "followed by 2 short bullet points on what to do if they did NOT initiate this activity."
-            )
+            system_prompt = SAFE_BANK_SYSTEM_PROMPT
             user_msg = (
-                f"Translate this verified safe bank notification log into simple English for the user:\n"
-                f"- Verdict: {report['verdict']}\n"
-                f"- Notification Summary: {sanitized_source}\n"
-                f"- Verification Notes:\n{evidence_bullets}\n\n"
-                f"Write:\n1) What This Genuine Alert Means (2 plain reassuring sentences)\n"
-                f"2) Routine Precaution (2 short bullet points if they did not initiate this activity)"
+                f"Message: {sanitized_source}\n"
+                f"Notes:\n{findings}"
             )
-            return [
-                {"role": "system", "content": safe_bank_prompt},
-                {"role": "user", "content": user_msg},
-            ]
+        return [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_msg},
+        ]
 
-    def explain_report(self, report: Dict[str, Any], max_new_tokens: int = 135) -> Dict[str, Any]:
+    def explain_report(self, report: Dict[str, Any], max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS) -> Dict[str, Any]:
         messages = self.build_prompt_messages(report)
         prompt = self.tokenizer.apply_chat_template(
             messages,
@@ -480,7 +511,7 @@ class LlamaSecurityAdvisor:
             "prompt_tokens": prompt_len,
         }
 
-    def analyze_and_explain(self, raw_input: str, max_new_tokens: int = 135) -> Dict[str, Any]:
+    def analyze_and_explain(self, raw_input: str, max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS) -> Dict[str, Any]:
         """Full 4-pillar pipeline: runs fast parallel sensors first, prints the
         instant breakdown, then generates the Llama ExecuTorch explanation."""
         report = self.sensors.analyze_input(raw_input)
@@ -532,6 +563,7 @@ if __name__ == "__main__":
             "Dear Customer, Rs. 15,500 has been successfully credited to your bank account via PhonePe. Click here to claim your reward and enter UPI PIN to receive the money: http://claim-reward-fake.in",
             "839201 is the OTP for txn of INR 2,499.00 at AMAZON on ICICI Bank Card XX4019. Valid for 5 mins. Do not share OTP with anyone. Bank never calls to verify OTP. - ICICI Bank",
             "URGENT: We detected a suspicious transaction of Rs 49,999 on your HDFC Credit Card. If this was NOT you, please share the 6-digit OTP sent to your phone with our agent to cancel the transaction.",
+            "URGENT: Suspicious txn of Rs 49,999 on HDFC Card. Share 6-digit OTP to cancel.",
             json.dumps(SAMPLE_NETWORK_ALERT),
         ]
         for idx, item in enumerate(demo_inputs, 1):

@@ -2,9 +2,10 @@ import torch
 from optimum.executorch import ExecuTorchModelForCausalLM
 from transformers import AutoTokenizer
 
-print("Loading offline model... (this takes a few seconds)")
-model = ExecuTorchModelForCausalLM.from_pretrained("./llama32_1b_instruct")
-tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B-Instruct")
+print("Loading offline quantized model... (this takes a few seconds)")
+model_dir = "./llama32_1b_instruct"
+model = ExecuTorchModelForCausalLM.from_pretrained(model_dir)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, local_files_only=True)
 
 print("\nModel loaded! Type 'quit' to exit.")
 print("-" * 40)

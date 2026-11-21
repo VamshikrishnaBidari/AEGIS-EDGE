@@ -25,7 +25,7 @@ flowchart LR
     E --> F
     F -->|Instant Terminal Output| G([Stage 1: Fast Sensor Verdict < 35 ms])
     F -->|Structured Evidence Prompt| H[Pillar 4: Meta Llama-3.2-1B-Instruct\nOffline ExecuTorch .pte via XNNPACK]
-    H -->|~20 - 30s Offline CPU Generation| I([Stage 2: Plain-Language Explanation & Safe Next Steps])
+    H -->|~3.5 - 4.0s Offline CPU Generation| I([Stage 2: Plain-Language Explanation & Safe Next Steps])
 ```
 
 ### Pillar Breakdown
@@ -38,7 +38,7 @@ flowchart LR
    * **Stage A (Zero-Latency Blacklist):** Compresses **73,819 verified phishing URLs** (PhishTank + CompPhish) into a **225 KB Bloom Filter (`bloom_filter.bin`)** for $O(1)$ instant lookups.
    * **Stage B (Zero-Day ML Catcher):** A 15-feature **Random Forest Classifier (`phishing_rf_model.joblib`)** trained on 20,028 balanced URLs using **CompPhish's Markov-chain character transition gibberish model (`gib_model.pki`)**, brand-impersonation detection, URL shortener lists (`shortUrls.txt`), and abused free-hosting lists (`free_hosting_services.txt`).
 4. **Pillar 4 — Offline Llama-3.2-1B ExecuTorch Advisor (`llama_advisor.py` + `llama32_1b_instruct/`):**
-   * Runs `meta-llama/Llama-3.2-1B-Instruct` quantized to 4-bit weights (`8da4w`) inside Meta's **ExecuTorch (`model.pte`)** runtime using the **XNNPACK** CPU backend, with the tokenizer saved locally for 100% air-gapped operation.
+   * Runs `meta-llama/Llama-3.2-1B-Instruct` with 8-bit dynamic activations / 4-bit linear weights (`8da4w`) and 8-bit embeddings (`8w`) inside Meta's **ExecuTorch (`model.pte`)** runtime using the **XNNPACK** CPU backend, with the tokenizer saved locally for 100% air-gapped operation.
 
 ---
 
@@ -48,9 +48,12 @@ flowchart LR
 codebase/
 ├── README.md                       # Project overview & architecture (this file)
 ├── SETUP.md                        # Complete setup, Hugging Face export & test guide
-├── .gitignore                      # Excludes 1.7 GB model.pte, venv/, and logs from Git
+├── .gitignore                      # Excludes the large model.pte, venv/, and logs from Git
 ├── requirements.txt                # CPU-optimized Python dependencies
 ├── llama_advisor.py                # MAIN 4-PILLAR COORDINATOR (SMS + URL + Network + Llama)
+├── aegis_ui.py                     # CustomTkinter desktop UI with Live Monitor & Scam Simulator
+├── benchmark_aegis.py              # ARM/CPU benchmarking and Notepad-friendly text report
+├── jetson_benchmark_results_001.txt # Recorded Jetson benchmark results
 ├── test_llama.py                   # Standalone Llama-3.2-1B ExecuTorch chat script
 ├── llama32_1b_instruct/            # Offline tokenizer files + model.pte (generated locally)
 ├── phishing_detector/              # Bloom Filter + CompPhish/PhishTank Random Forest engine
@@ -79,7 +82,7 @@ For full OS-specific prerequisites and test cases, read [**`SETUP.md`**](./SETUP
   ```
 
 ### Step 2: Obtain or Export `model.pte` (Hugging Face Approval Required Once)
-Because `llama32_1b_instruct/model.pte` is **1.7 GB**, it is ignored by `.gitignore`. Either copy `model.pte` from a teammate into `codebase/llama32_1b_instruct/model.pte`, **or** export it once using Hugging Face:
+The quantized `llama32_1b_instruct/model.pte` is large and is ignored by `.gitignore`. The provided export is approximately 915 MB. Either copy `model.pte` and the tokenizer files from a teammate into `codebase/llama32_1b_instruct/`, **or** export it once using Hugging Face:
 1. Accept Meta's community license on [**meta-llama/Llama-3.2-1B-Instruct**](https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct).
 2. Generate a **Read** access token at [**huggingface.co/settings/tokens**](https://huggingface.co/settings/tokens) and log in:
    ```bash
@@ -91,25 +94,50 @@ Because `llama32_1b_instruct/model.pte` is **1.7 GB**, it is ignored by `.gitign
      --model "meta-llama/Llama-3.2-1B-Instruct" \
      --task "text-generation" \
      --recipe "xnnpack" \
+     --use_custom_sdpa \
+     --use_custom_kv_cache \
      --qlinear 8da4w \
+     --qembedding 8w \
      --output_dir "./llama32_1b_instruct"
    ```
 
-### Step 3: Run the Unified 4-Pillar Advisor
+### Step 3: Run AEGIS
 ```bash
+# Interactive terminal advisor
 python llama_advisor.py
-```
-*(Or run `python llama_advisor.py --demo` to execute the automated 4-case benchmark demo.)*
 
-> ### ⏱️ Note on Offline Llama Response Time (~25–30 Seconds)
+# Desktop UI
+python aegis_ui.py
+
+# Automated 4-case terminal demo
+python llama_advisor.py --demo
+```
+
+> ### ⏱️ Note on Offline Llama Response Time (Sub-5 Seconds)
 > When you enter an SMS, URL, or Network alert in `llama_advisor.py`:
 > * **Stage 1 (`[FAST SENSOR BREAKDOWN]`):** Prints **instantly (~5–35 ms)** with the parallel SMS ML + Phishing URL ML verdict, confidence, and extracted technical evidence.
-> * **Stage 2 (`>>> AEGIS Llama Advisory`):** Takes **~20 to 30 seconds** because `Llama-3.2-1B-Instruct` (`model.pte`) is generating the plain-English advisory **100% offline on your local CPU via ExecuTorch** (~4.3 tokens/sec, zero cloud calls).
+> * **Stage 2 (`>>> AEGIS Llama Advisory`):** Generates in approximately **3.5–4.0 seconds** on the recorded ARM Jetson-class device, using the 8-bit quantized Llama `.pte` through ExecuTorch/XNNPACK with no cloud calls.
+
+### Benchmark
+Run the local benchmark and save a Notepad-friendly report:
+```bash
+python benchmark_aegis.py \
+  --model-dir "./llama32_1b_instruct" \
+  --quant "8da4w / 8w (qembedding)"
+```
+For a faster report without sustained and offline checks:
+```bash
+python benchmark_aegis.py \
+  --model-dir "./llama32_1b_instruct" \
+  --quant "8da4w / 8w (qembedding)" \
+  --skip sustained offline
+```
+The recorded results are in [`jetson_benchmark_results_001.txt`](./jetson_benchmark_results_001.txt): 3.762 s average LLM total time, 13.08 end-to-end tok/s, 923.1 MB model directory, and 6.79 s model/advisor load time.
 
 ---
 
 ## 5. Next Steps:
-See [**`SETUP.md`**](./SETUP.md) for the copy-paste test suite and next modules to pick up:
+See [**`SETUP.md`**](./SETUP.md) for the copy-paste test suite and setup details:
 1. **Live Network Alert Watcher:** Tail `traffic_monitor/alerts.jsonl` into `llama_advisor.py`.
-2. **Local Web Dashboard UI:** Display the instant (<35 ms) sensor breakdown card immediately while streaming the ~25–30s Llama ExecuTorch explanation.
-3. **Arm SoC Benchmarking:** Record `PyTorchObserver` latency, tokens/sec, and RAM metrics on Raspberry Pi 5 for the PS3 Technical Report.
+2. **Desktop UI:** Run `aegis_ui.py` for the Live Monitor and Scam Simulator.
+3. **Arm SoC Benchmarking:** Use `benchmark_aegis.py` to record latency, throughput, memory, sustained operation, and offline reliability.

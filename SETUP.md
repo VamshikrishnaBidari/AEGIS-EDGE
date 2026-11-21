@@ -60,7 +60,7 @@ If you prefer an isolated environment (or are on Fedora/Ubuntu where `venv` is s
 
 ## 3. Getting `model.pte` (Hugging Face Approval & ExecuTorch Export)
 
-Because `model.pte` is **1.7 GB**, it is excluded from GitHub via `.gitignore`. However, the offline tokenizer files (`tokenizer.json`, `tokenizer_config.json`, `special_tokens_map.json`) are already included inside `codebase/llama32_1b_instruct/`.
+Because `model.pte` is large, it is excluded from GitHub via `.gitignore`. The current quantized export is approximately 915 MB. The offline tokenizer files (`tokenizer.json`, `tokenizer_config.json`, `special_tokens_map.json`) are already included inside `codebase/llama32_1b_instruct/`.
 
 You can get `model.pte` in **one of two ways**:
 * **Fast Way (Team Drive / USB Copy):** If a teammate shares the exported `model.pte` file with you, simply copy it into `codebase/llama32_1b_instruct/model.pte`. You do **not** need a Hugging Face account or export step!
@@ -90,22 +90,25 @@ optimum-cli export executorch \
   --model "meta-llama/Llama-3.2-1B-Instruct" \
   --task "text-generation" \
   --recipe "xnnpack" \
+  --use_custom_sdpa \
+  --use_custom_kv_cache \
   --qlinear 8da4w \
+  --qembedding 8w \
   --output_dir "./llama32_1b_instruct"
 ```
-* **What this does:** Downloads `Llama-3.2-1B-Instruct`, applies 8-bit dynamic activation / 4-bit weight quantization (`8da4w`), compiles it for the **XNNPACK** CPU backend, and writes `codebase/llama32_1b_instruct/model.pte` (`~1.7 GB`).
+* **What this does:** Downloads `Llama-3.2-1B-Instruct`, applies 8-bit dynamic activation / 4-bit linear weight quantization (`8da4w`) plus 8-bit embedding quantization (`8w`), enables custom SDPA and KV cache, compiles for the **XNNPACK** CPU backend, and writes `codebase/llama32_1b_instruct/model.pte`.
 * Once `model.pte` is inside `codebase/llama32_1b_instruct/`, **everything runs 100% offline** (you can completely disconnect from the internet).
 
 ---
 
 ## 4. Running & Testing the Unified 4-Pillar System (`llama_advisor.py`)
 
-> ### ⚠️ Important Note on Offline Model Response Time (~25–30 Seconds)
+> ### ⚠️ Offline Model Response Time (Sub-5 Seconds)
 > When you test `llama_advisor.py`, you will see **two stages** of output for every query:
 > 1. **Stage 1 — `[FAST SENSOR BREAKDOWN]` (~5 to 35 milliseconds):**  
 >    Prints **instantly**! It runs the SMS Ensemble ML classifier and the PhishTank/CompPhish Hybrid URL Detector **in parallel**, checks Indian OTP/UPI/KYC fraud patterns, and displays the fused verdict and technical evidence immediately.
-> 2. **Stage 2 — `>>> AEGIS Llama Advisory` (~20 to 30 seconds):**  
->    Takes **approximately 25–30 seconds** to reply because the quantized `Llama-3.2-1B-Instruct` model (`model.pte`) is generating the plain-English explanation and remediation steps **100% offline on your CPU via ExecuTorch** (`~4.3 tokens/sec` in the Python wrapper, with zero cloud API calls). Please wait ~25–30s after `"Llama-3.2-1B ExecuTorch generating plain-language advisory..."` appears!
+> 2. **Stage 2 — `>>> AEGIS Llama Advisory` (typically ~3.5–4.0 seconds):**  
+>    The 8-bit quantized `Llama-3.2-1B-Instruct` model generates the plain-English explanation and remediation steps **100% offline on your CPU via ExecuTorch/XNNPACK**. The recorded ARM benchmark averaged 13.08 end-to-end tokens/sec and 3.762 seconds per response.
 
 ### Run Interactive Mode
 ```bash
@@ -118,6 +121,22 @@ python llama_advisor.py
 cd codebase
 python llama_advisor.py --demo
 ```
+
+### Run the Desktop UI
+```bash
+cd codebase
+python aegis_ui.py
+```
+The UI provides a Live Monitor tab with CPU/RAM/network telemetry and a Scam Simulator tab with preset and custom messages.
+
+### Run the ARM/Edge Benchmark
+```bash
+cd codebase
+python benchmark_aegis.py \
+  --model-dir "./llama32_1b_instruct" \
+  --quant "8da4w / 8w (qembedding)"
+```
+The benchmark writes a timestamped `benchmark_summary_*.txt` report unless `--out-file` is supplied. Use `--skip sustained` for a faster run, or `--skip sustained offline` for only detection and LLM measurements.
 
 ---
 
@@ -170,7 +189,7 @@ net
 
 ## 6. Running Individual Pillars Standalone
 
-If you want to test or develop any of the 3 sensor modules independently without loading the 1.7 GB Llama model:
+If you want to test or develop any of the 3 sensor modules independently without loading the quantized Llama model:
 
 1. **Pillar 3 — Hybrid Phishing URL Scanner (`phishing_detector/`):**
    ```bash
