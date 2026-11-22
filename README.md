@@ -307,3 +307,11 @@ plus Npcap on Windows.
 
 Detailed setup, test cases, export commands, and platform build instructions
 are in [SETUP.md](./SETUP.md).
+
+## Team
+
+- Shobitha Arun Kumar
+- Shresh Parti
+- Vamshikrishna V Bidari
+
+From the Department of ECE, NITK Surathkal.
