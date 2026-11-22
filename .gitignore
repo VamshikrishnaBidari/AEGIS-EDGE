@@ -28,6 +28,9 @@ benchmarks/
 *.pcap
 *.pcapng
 *.log
+dist/
+build/
+packaging/dist/
 
 # 4. Workspace / Scratch / Agent Folders (when git is initialized at project root)
 workspace_temp/
@@ -42,3 +45,6 @@ Thumbs.db
 .idea/
 *.swp
 *~
+
+# Generated release artifacts
+release/

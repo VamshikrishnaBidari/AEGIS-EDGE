@@ -15,6 +15,11 @@ When given an SMS, URL, or Network Alert:
      to generate a plain-language explanation completely offline.
 """
 
+import multiprocessing
+
+if __name__ == "__main__":
+    multiprocessing.freeze_support()
+
 import argparse
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
@@ -41,6 +46,25 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 SMS_DIR = os.path.join(ROOT_DIR, "sms_detector")
 PHISHING_DIR = os.path.join(ROOT_DIR, "phishing_detector")
 DEFAULT_MODEL_DIR = os.path.join(ROOT_DIR, "llama32_1b_instruct")
+
+
+def resolve_model_dir(model_dir: str = DEFAULT_MODEL_DIR) -> str:
+    """Resolve model files in source, wheel, or PyInstaller onedir builds."""
+    candidates = [
+        model_dir,
+        os.path.join(os.getcwd(), "llama32_1b_instruct"),
+    ]
+    executable = getattr(sys, "executable", "")
+    if executable:
+        exe_dir = os.path.dirname(os.path.abspath(executable))
+        candidates.extend([
+            os.path.join(exe_dir, "llama32_1b_instruct"),
+            os.path.join(os.path.dirname(exe_dir), "llama32_1b_instruct"),
+        ])
+    for candidate in candidates:
+        if candidate and os.path.isfile(os.path.join(candidate, "model.pte")):
+            return os.path.abspath(candidate)
+    return model_dir
 
 # Fail loudly (and clearly) if a required folder was not copied to this machine.
 for _d in (SMS_DIR, PHISHING_DIR):
@@ -406,16 +430,16 @@ DEFAULT_MAX_NEW_TOKENS = 60
 
 class LlamaSecurityAdvisor:
     def __init__(self, model_dir: str = DEFAULT_MODEL_DIR):
-        self.model_dir = model_dir
+        self.model_dir = resolve_model_dir(model_dir)
         print(f"[AEGIS] Initializing fast ML sensors (SMS Ensemble + PhishTank Bloom Filter + Random Forest)...")
         t_s = time.perf_counter()
         self.sensors = FastThreatSensors()
         print(f"[AEGIS] Fast sensors ready in {round(time.perf_counter() - t_s, 2)}s.")
 
-        print(f"[AEGIS] Loading offline Llama-3.2-1B ExecuTorch model & tokenizer from: {model_dir}")
+        print(f"[AEGIS] Loading offline Llama-3.2-1B ExecuTorch model & tokenizer from: {self.model_dir}")
         t0 = time.perf_counter()
-        self.model = ExecuTorchModelForCausalLM.from_pretrained(model_dir)
-        self.tokenizer = AutoTokenizer.from_pretrained(model_dir, local_files_only=True)
+        self.model = ExecuTorchModelForCausalLM.from_pretrained(self.model_dir)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_dir, local_files_only=True)
         self.load_time_s = round(time.perf_counter() - t0, 2)
         print(f"[AEGIS] Llama-3.2-1B ExecuTorch ready in {self.load_time_s}s (100% offline mode).")
 
@@ -551,7 +575,7 @@ SAMPLE_NETWORK_ALERT = {
 }
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="AEGIS 4-Pillar Offline Cybersecurity Assistant")
     parser.add_argument("--model-dir", default=DEFAULT_MODEL_DIR, help="Path to offline ExecuTorch model + tokenizer folder")
     parser.add_argument("--demo", action="store_true", help="Run built-in 4-pillar demos (SMS + Phishing URL + Network Intrusion)")
@@ -587,3 +611,7 @@ if __name__ == "__main__":
                 user_text = json.dumps(SAMPLE_NETWORK_ALERT)
             res = advisor.analyze_and_explain(user_text)
             print(f"\n>>> AEGIS Llama Advisory ({res['inference_time_s']}s):\n{res['explanation']}")
+
+
+if __name__ == "__main__":
+    main()

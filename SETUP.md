@@ -70,8 +70,8 @@ pip install -r requirements-lock.txt
 Because `model.pte` is large, it is excluded from GitHub via `.gitignore`. The current quantized export is approximately 915 MB. The offline tokenizer files (`tokenizer.json`, `tokenizer_config.json`, `special_tokens_map.json`) are already included inside `codebase/llama32_1b_instruct/`.
 
 You can get `model.pte` in **one of two ways**:
-* **Fast Way (Team Drive / USB Copy):** If a teammate shares the exported `llama32_1b_instruct` folder, copy it into `codebase/llama32_1b_instruct/`. You do **not** need a Hugging Face account or export step!
-* **Standard Way (Export Locally Once via Hugging Face):** Follow the 4 steps below once on your machine:
+* **Copy a published model folder:** If you have a separately distributed `llama32_1b_instruct` folder, copy it into `codebase/llama32_1b_instruct/`. You do **not** need a Hugging Face account or export step.
+* **Export locally once via Hugging Face:** Follow the steps below once on your machine.
 
 ### Step 3.1: Request Meta Llama Access on Hugging Face
 `Llama-3.2-1B-Instruct` is a gated model on Hugging Face—you must accept Meta's community license once:
@@ -103,8 +103,9 @@ optimum-cli export executorch \
   --use_custom_kv_cache \
   --qlinear 8da4w \
   --qembedding 8w \
-  --output_dir ".\llama32_1b_instruct"
+  --output_dir "./llama32_1b_instruct"
 ```
+On Windows PowerShell, use `--output_dir ".\llama32_1b_instruct"`.
 * **What this does:** Downloads `Llama-3.2-1B-Instruct`, applies 8-bit dynamic activation / 4-bit linear weight quantization (`8da4w`) plus 8-bit embedding quantization (`8w`), enables custom SDPA and KV cache, compiles for the **XNNPACK** CPU backend, and writes `codebase/llama32_1b_instruct/model.pte`.
 * Once the export is complete, run the advisor with `python llama_advisor.py --model-dir ".\llama32_1b_instruct"`. Everything runs 100% offline after export (you can completely disconnect from the internet).
 
@@ -151,6 +152,93 @@ python tests/benchmark_aegis.py \
   --quant "8da4w / 8w (qembedding)"
 ```
 The benchmark writes a timestamped `benchmark_summary_*.txt` report under `tests/` unless `--out-file` is supplied. Use `--skip sustained` for a faster run, or `--skip sustained offline` for only detection and LLM measurements.
+
+### Build a Wheel and Linux Executables
+
+The wheel and standalone distributions exclude `llama32_1b_instruct/model.pte`. Keep the model outside the package and place it beside the executable distribution after build.
+
+#### Desktop Linux (`x86_64`)
+Run from the repository root on a Linux `x86_64` machine:
+```bash
+bash packaging/build_linux_x86_64.sh
+```
+The desktop build script prefers a sibling `../venv/bin/python` environment when it exists. Override it with `PYTHON_BIN=/path/to/python bash packaging/build_linux_x86_64.sh`.
+
+#### Jetson/Linux (`aarch64`)
+Run from the repository root on the actual Jetson/Linux ARM64 target:
+```bash
+bash packaging/build_jetson_linux_arm64.sh
+```
+
+The build scripts produce:
+- `dist/aegis_edge-*.whl`
+- `dist/aegis_advisor/` (`--onedir`)
+- `dist/aegis_ui/` (`--onedir`)
+
+Install the wheel without the model on a compatible Linux Python environment:
+```bash
+python -m pip install dist/aegis_edge-*.whl
+aegis-advisor
+aegis-ui
+```
+
+For the standalone builds, copy or generate `llama32_1b_instruct/` beside `dist/`, then run:
+```bash
+./dist/aegis_advisor/aegis_advisor
+./dist/aegis_ui/aegis_ui
+```
+
+The model is intentionally outside the generated artifacts. This avoids embedding approximately 914 MB in the wheel and avoids one-time extraction delays and dynamic-library issues from a PyInstaller `--onefile` build.
+
+Live packet capture still requires Linux `sudo` or Administrator privileges plus the platform's packet-capture library.
+
+### Install from the Wheel
+The wheel is a lightweight Python package. It does not include `llama32_1b_instruct/model.pte`.
+
+```bash
+python3 -m venv aegis-venv
+source aegis-venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu \
+  dist/aegis_edge-0.1.0-py3-none-any.whl
+```
+
+On Windows PowerShell:
+
+```powershell
+py -3 -m venv aegis-venv
+.\\aegis-venv\\Scripts\\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install dist\aegis_edge-0.1.0-py3-none-any.whl
+```
+
+After installation, place or export `llama32_1b_instruct/` in the working directory:
+
+```text
+working-directory/
+├── llama32_1b_instruct/
+│   ├── model.pte
+│   ├── tokenizer.json
+│   ├── tokenizer_config.json
+│   └── special_tokens_map.json
+└── aegis-wheel.whl
+```
+
+Run the installed console entry points:
+
+```bash
+aegis-advisor --model-dir ./llama32_1b_instruct
+aegis-ui
+```
+
+Alternative source-style commands remain available in a source checkout:
+
+```bash
+python llama_advisor.py --model-dir ./llama32_1b_instruct
+python aegis_ui.py
+```
+
+For live packet capture, run the Linux binary or source under `sudo` or the Windows executable under Administrator/Npcap.
 
 ---
 

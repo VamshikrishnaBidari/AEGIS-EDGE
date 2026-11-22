@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aegis-edge"
+version = "0.1.0"
+description = "AEGIS EDGE - Offline On-Device AI Cybersecurity Assistant"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "bitarray==3.12.4",
+    "customtkinter==6.0.0",
+    "executorch==1.5.1",
+    "huggingface_hub==1.33.0",
+    "joblib==1.6.0",
+    "mmh3==5.3.1",
+    "numpy==2.2.6",
+    "openpyxl==3.1.5",
+    "optimum==2.0.0",
+    "optimum-executorch==1.1.0",
+    "pandas==2.3.3",
+    "platformdirs==2.5.1",
+    "psutil==7.2.2",
+    "scapy==2.8.0",
+    "scikit-learn==1.9.1",
+    "scipy==1.15.3",
+    "tldextract==5.4.0",
+    "tokenizers==0.22.2",
+    "torch==2.14.1",
+    "torchao==0.18.0",
+    "transformers==5.0.0rc1",
+]
+
+[project.scripts]
+aegis-advisor = "llama_advisor:main"
+aegis-ui = "aegis_ui:main"
+
+[tool.setuptools]
+py-modules = ["llama_advisor", "aegis_ui"]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["phishing_detector*", "sms_detector*", "traffic_monitor*"]
+
+[tool.setuptools.package-data]
+"phishing_detector" = ["*.bin", "*.pki", "*.csv", "*.xlsx", "*.txt", "*.joblib"]
+"sms_detector" = ["*.joblib", "*.csv", "*.txt"]
+"traffic_monitor" = ["*.txt", "*.jsonl"]

@@ -1,3 +1,8 @@
+import multiprocessing
+
+if __name__ == "__main__":
+    multiprocessing.freeze_support()
+
 import os
 import sys
 import threading
@@ -241,6 +246,10 @@ class AegisDesktopWidget(ctk.CTk):
         self.is_generating = False
         self._set_buttons_state("normal")
 
-if __name__ == "__main__":
+def main():
     app = AegisDesktopWidget()
     app.mainloop()
+
+
+if __name__ == "__main__":
+    main()

@@ -13,7 +13,7 @@ pandas==2.3.3
 platformdirs==2.5.1
 psutil==7.2.2
 scapy==2.8.0
-scikit-learn==1.7.2
+scikit-learn==1.9.1
 scipy==1.15.3
 tldextract==5.4.0
 tokenizers==0.22.2

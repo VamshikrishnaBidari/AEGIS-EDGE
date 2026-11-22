@@ -12,6 +12,10 @@ Produces:
   - bloom_filter.bin          (Zero-latency O(1) blacklist of 73,000+ phishing URLs)
   - phishing_rf_model.joblib  (Random Forest trained on 14 domain/lexical/brand/gibberish features)
 """
+import multiprocessing
+
+if __name__ == "__main__":
+    multiprocessing.freeze_support()
 
 import csv
 import math
@@ -129,7 +133,7 @@ def avg_transition_prob(text: str) -> float:
     return math.exp(log_prob / (transition_ct or 1))
 
 
-def detect_gibberish_host(domain: str, subdomain: str) -> Tuple_or_List:
+def detect_gibberish_host(domain: str, subdomain: str) -> tuple[int, float]:
     """Uses CompPhish's Markov transition model + mixed digit/consonant check
     so real English words (like 'arm-education' or 'sciencedirect') are NEVER
     falsely flagged as random gibberish."""

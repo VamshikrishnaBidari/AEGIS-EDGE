@@ -1,158 +1,253 @@
-# AEGIS EDGE — On-Device AI Cybersecurity Assistant
-**ARM Bharat AI-SoC Challenge 2026–27 | Problem Statement 3**
+# AEGIS EDGE
 
-> **Full Setup, Hugging Face Model Access & Testing Instructions:** See [**`SETUP.md`**](./SETUP.md)
->
-> Markdown documentation is authoritative. Legacy `.txt` documentation is retained only for backup and will not be maintained.
+**On-Device AI Cybersecurity Assistant**
 
----
+ARM Bharat AI-SoC Challenge 2026-27 | Problem Statement 3
 
-## 1. Overview
-**AEGIS EDGE** is a 100% offline, on-device AI cybersecurity assistant built for resource-constrained Arm and Linux edge devices (such as Raspberry Pi 5 and edge laptops) with **zero cloud dependency**.
+AEGIS EDGE combines fast, offline threat sensors with a local
+Meta Llama-3.2-1B-Instruct model to explain and prioritize cybersecurity risks:
 
-It combines **three millisecond-speed threat sensors** (Network Intrusion Detection, SMS Scam Ensemble ML, and a Hybrid Phishing URL Detector) with a **local quantized Meta Llama-3.2-1B-Instruct model running on ExecuTorch (XNNPACK)**. Instead of relying on an LLM to guess whether raw traffic is malicious, our fast deterministic/ML sensors extract machine-verifiable evidence in **5–35 milliseconds**, and Llama translates that evidence into plain-English explanations and concrete safety actions for non-technical users.
+- SMS scam classification
+- Hybrid phishing URL detection
+- Network intrusion monitoring
+- Offline plain-language security advice
 
----
+Fast sensor verdicts normally return in milliseconds. The quantized
+ExecuTorch/Llama stage generates responses locally without cloud API calls.
 
-## 2. The 4-Pillar Architecture
+## Distribution Options
 
-```mermaid
-flowchart LR
-    A[Incoming SMS / URL / Network Packet] --> B{Fast Parallel Sensors\n5 - 35 ms}
-    B -->|Pillar 1| C[Network Intrusion Monitor\nScapy + Device Baseline + DNS Entropy]
-    B -->|Pillar 2| D[SMS Scam Classifier\nTF-IDF + Soft-Voting SVM/LR/NB]
-    B -->|Pillar 3| E[Hybrid Phishing URL Engine\n73.8k-URL Bloom Filter + 15-Feature RF]
-    C --> F[Fused Evidence & Indian Fraud Rules\nOTP-Share / UPI-PIN / Genuine Bank Guard]
-    D --> F
-    E --> F
-    F -->|Instant Terminal Output| G([Stage 1: Fast Sensor Verdict < 35 ms])
-    F -->|Structured Evidence Prompt| H[Pillar 4: Meta Llama-3.2-1B-Instruct\nOffline ExecuTorch .pte via XNNPACK]
-    H -->|~3.5 - 4.0s Offline CPU Generation| I([Stage 2: Plain-Language Explanation & Safe Next Steps])
+Choose the option appropriate for your platform:
+
+| Option | Use |
+| --- | --- |
+| Source repository | Development, audit, or custom installation |
+| Python wheel | Portable Python installation on a compatible OS and architecture |
+| Linux `x86_64` onedir binary | Desktop Linux distribution without a Python environment |
+| Linux ARM64 onedir binary | Jetson or other ARM64 Linux devices |
+| Windows onedir binary | Windows distribution, when a native Windows build is released |
+
+The `llama32_1b_instruct/model.pte` file is deliberately distributed outside
+source packages and executables. It can be generated once or copied as a
+separate model folder.
+
+## Quick Start from Source
+
+### 1. Install system prerequisites
+
+Ubuntu, Debian, Raspberry Pi OS, or Jetson:
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip python3-tk \
+  libpcap-dev tcpdump
 ```
 
-### Pillar Breakdown
-1. **Pillar 1 — Network Intrusion Detection (`traffic_monitor/`):**
-   * Captures live packets using `scapy`, learns a per-device golden baseline, and detects **Port Scans** (fast and slow), **SYN Floods**, **ICMP Ping Floods**, **Brute-Force Connection Attempts**, and **High-Entropy DNS Exfiltration / DGA Malware**.
-2. **Pillar 2 — SMS Scam Ensemble Classifier (`sms_detector/`):**
-   * Two-stage text normalization + word/character n-gram TF-IDF pipeline feeding a soft-voting ensemble of **Calibrated LinearSVC (weight 2)**, **Logistic Regression (weight 2)**, and **Multinomial Naive Bayes (weight 1)**.
-   * Paired with an **Indian Banking / UPI / OTP Evidence Layer** in `llama_advisor.py` that catches OTP-sharing traps and UPI PIN collect traps while preventing false alarms on genuine bank OTP/transaction notifications (`15/15 = 100%` accuracy on `sms_test.txt`).
-3. **Pillar 3 — Hybrid Phishing URL Detector (`phishing_detector/`):**
-   * **Stage A (Zero-Latency Blacklist):** Compresses **73,819 verified phishing URLs** (PhishTank + CompPhish) into a **225 KB Bloom Filter (`bloom_filter.bin`)** for $O(1)$ instant lookups.
-   * **Stage B (Zero-Day ML Catcher):** A 15-feature **Random Forest Classifier (`phishing_rf_model.joblib`)** trained on 20,028 balanced URLs using **CompPhish's Markov-chain character transition gibberish model (`gib_model.pki`)**, brand-impersonation detection, URL shortener lists (`shortUrls.txt`), and abused free-hosting lists (`free_hosting_services.txt`).
-4. **Pillar 4 — Offline Llama-3.2-1B ExecuTorch Advisor (`llama_advisor.py` + `llama32_1b_instruct/`):**
-   * Runs `meta-llama/Llama-3.2-1B-Instruct` with 8-bit dynamic activations / 4-bit linear weights (`8da4w`) and 8-bit embeddings (`8w`) inside Meta's **ExecuTorch (`model.pte`)** runtime using the **XNNPACK** CPU backend, with the tokenizer saved locally for 100% air-gapped operation.
+Fedora:
 
----
+```bash
+sudo dnf install -y python3 python3-pip python3-tkinter libpcap-devel tcpdump
+```
 
-## 3. Repository Structure
+Windows:
+
+1. Install Python 3 and add it to `PATH`.
+2. Install Npcap using the [official Npcap installer](https://npcap.com/#download).
+
+### 2. Create a Python environment
+
+Linux:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+Windows PowerShell:
+
+```powershell
+py -3 -m venv venv
+.\\venv\\Scripts\\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+`requirements.txt` contains the portable dependency set.
+`requirements-lock.txt` is a Jetson Nano environment snapshot and is not
+recommended for other platforms.
+
+### 3. Obtain the Llama model
+
+Copy `llama32_1b_instruct/` into the repository root, or export it once.
+The folder must contain:
 
 ```text
-codebase/
-├── README.md                       # Project overview & architecture (this file)
-├── SETUP.md                        # Complete setup, Hugging Face export & test guide
-├── .gitignore                      # Excludes the large model.pte, venv/, and logs from Git
-├── requirements.txt                # CPU-optimized Python dependencies
-├── requirements-lock.txt           # Jetson Nano pinned environment snapshot
-├── llama_advisor.py                # MAIN 4-PILLAR COORDINATOR (SMS + URL + Network + Llama)
-├── aegis_ui.py                     # CustomTkinter desktop UI with Live Monitor & Scam Simulator
-├── tests/
-│   ├── benchmark_aegis.py          # ARM/CPU benchmarking and Notepad-friendly text report
-│   ├── jetson_benchmark_results_001.txt # Recorded Jetson benchmark results
-│   └── test_llama.py               # Standalone Llama-3.2-1B ExecuTorch chat script
-├── llama32_1b_instruct/            # Offline tokenizer files + model.pte (generated locally)
-├── phishing_detector/              # Bloom Filter + CompPhish/PhishTank Random Forest engine
-├── sms_detector/                   # Soft-voting SMS Scam classifier + Indian SMS test suite
-└── traffic_monitor/                # Scapy network intrusion monitor + DNS attack simulator
+llama32_1b_instruct/
+├── model.pte
+├── tokenizer.json
+├── tokenizer_config.json
+└── special_tokens_map.json
 ```
 
----
+To export the model, accept the
+[Meta Llama model license](https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct),
+create a Hugging Face read token, and authenticate:
 
-## 4. Quick Start (`venv` is Optional!)
-
-For full OS-specific prerequisites and test cases, read [**`SETUP.md`**](./SETUP.md).
-
-### Step 1: Install Python Dependencies
-* **Without `venv` (Direct / Global Python — if you never used `venv`):**
-  ```bash
-  cd codebase
-  pip install -r requirements.txt
-  ```
-* **With `venv` (Optional — if you prefer an isolated environment):**
-  ```bash
-  python3 -m venv venv
-  source venv/bin/activate      # Windows PowerShell: .\venv\Scripts\Activate.ps1
-  cd codebase
-  pip install -r requirements.txt
-  ```
-* **Jetson Nano pinned environment:**
-  ```bash
-  pip install -r requirements-lock.txt
-  ```
-  Use the lock file to reproduce the Jetson Nano benchmark environment. It is an environment snapshot and may include Jetson/Ubuntu-specific packages; use `requirements.txt` for normal setup on other devices.
-
-### Step 2: Obtain or Export `model.pte` (Hugging Face Approval Required Once)
-The quantized model directory is large and is ignored by `.gitignore`. The provided export is approximately 915 MB. Either copy `model.pte` and the tokenizer files from a teammate into `codebase/llama32_1b_instruct/`, **or** export it once using Hugging Face:
-1. Accept Meta's community license on [**meta-llama/Llama-3.2-1B-Instruct**](https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct).
-2. Install the export dependency:
-   ```bash
-   pip install coremltools
-   ```
-   This package is also included in `requirements.txt`.
-3. Generate a **Read** access token at [**huggingface.co/settings/tokens**](https://huggingface.co/settings/tokens) and log in:
-   ```bash
-   huggingface-cli login
-   ```
-4. Export the quantized ExecuTorch model into `.\llama32_1b_instruct`:
-   ```bash
-   optimum-cli export executorch \
-     --model "meta-llama/Llama-3.2-1B-Instruct" \
-     --task "text-generation" \
-     --recipe "xnnpack" \
-     --use_custom_sdpa \
-     --use_custom_kv_cache \
-     --qlinear 8da4w \
-     --qembedding 8w \
-     --output_dir ".\llama32_1b_instruct"
-   ```
-
-### Step 3: Run AEGIS
 ```bash
-# Interactive terminal advisor
-python llama_advisor.py
-python llama_advisor.py --model-dir ".\llama32_1b_instruct"
-
-# Desktop UI
-python aegis_ui.py
-
-# Automated 4-case terminal demo
-python llama_advisor.py --demo
+pip install coremltools
+huggingface-cli login
 ```
 
-> ### ⏱️ Note on Offline Llama Response Time (Sub-5 Seconds)
-> When you enter an SMS, URL, or Network alert in `llama_advisor.py`:
-> * **Stage 1 (`[FAST SENSOR BREAKDOWN]`):** Prints **instantly (~5–35 ms)** with the parallel SMS ML + Phishing URL ML verdict, confidence, and extracted technical evidence.
-> * **Stage 2 (`>>> AEGIS Llama Advisory`):** Generates in approximately **3.5–4.0 seconds** on the recorded ARM Jetson-class device, using the 8-bit quantized Llama `.pte` through ExecuTorch/XNNPACK with no cloud calls.
+Then run:
 
-### Benchmark
-Run the local benchmark and save a Notepad-friendly report:
+```bash
+optimum-cli export executorch \
+  --model "meta-llama/Llama-3.2-1B-Instruct" \
+  --task "text-generation" \
+  --recipe "xnnpack" \
+  --use_custom_sdpa \
+  --use_custom_kv_cache \
+  --qlinear 8da4w \
+  --qembedding 8w \
+  --output_dir ".\llama32_1b_instruct"
+```
+
+The model is approximately 914 MB and is not downloaded or packaged by the
+wheel or standalone binary build.
+
+### 4. Run AEGIS
+
+Terminal advisor:
+
+```bash
+python llama_advisor.py --model-dir ./llama32_1b_instruct
+```
+
+Automated demo:
+
+```bash
+python llama_advisor.py --demo --model-dir ./llama32_1b_instruct
+```
+
+Desktop UI:
+
+```bash
+python aegis_ui.py
+```
+
+Standalone Llama test:
+
+```bash
+python tests/test_llama.py
+```
+
+## Install from the Python Wheel
+
+When a `aegis_edge-*.whl` release asset is available:
+
+```bash
+python3 -m venv aegis-venv
+source aegis-venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu \
+  aegis_edge-0.1.0-py3-none-any.whl
+```
+
+Windows:
+
+```powershell
+py -3 -m venv aegis-venv
+.\\aegis-venv\\Scripts\\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install aegis_edge-0.1.0-py3-none-any.whl
+```
+
+Copy or export `llama32_1b_instruct/` into the working directory, then run:
+
+```bash
+aegis-advisor --model-dir ./llama32_1b_instruct
+aegis-ui
+```
+
+The wheel contains AEGIS source modules and detector artifacts. It does not
+contain the model weights. PyTorch and ExecuTorch dependencies remain
+platform- and architecture-specific, so install the wheel in a compatible
+Python environment.
+
+## Run a Linux `x86_64` Binary Release
+
+Extract the released `aegis_advisor` or `aegis_ui` archive. Place
+`llama32_1b_instruct/` beside the executable distribution:
+
+```text
+aegis-release/
+├── aegis_advisor/
+├── aegis_ui/
+└── llama32_1b_instruct/
+```
+
+Run:
+
+```bash
+./aegis_advisor/aegis_advisor --model-dir ./llama32_1b_instruct
+./aegis_ui/aegis_ui
+```
+
+Linux binaries require matching `x86_64` host libraries. Live packet capture
+also requires `sudo` or the appropriate packet-capture privileges.
+
+## Benchmarking
+
+Run the benchmark from the source repository:
+
 ```bash
 python tests/benchmark_aegis.py \
-  --model-dir ".\llama32_1b_instruct" \
+  --model-dir ./llama32_1b_instruct \
   --quant "8da4w / 8w (qembedding)"
 ```
-For a faster report without sustained and offline checks:
+
+Recorded Jetson benchmark results are in
+[tests/jetson_benchmark_results_001.txt](./tests/jetson_benchmark_results_001.txt).
+
+## Network Monitor
+
+Find the active interface and IP address, then run:
+
 ```bash
-python tests/benchmark_aegis.py \
-  --model-dir ".\llama32_1b_instruct" \
-  --quant "8da4w / 8w (qembedding)" \
-  --skip sustained offline
+cd traffic_monitor
+sudo python3 main.py --ip <YOUR_IPV4> --iface "<YOUR_INTERFACE>"
 ```
-The recorded results are in [`tests/jetson_benchmark_results_001.txt`](./tests/jetson_benchmark_results_001.txt): 3.762 s average LLM total time, 13.08 end-to-end tok/s, 923.1 MB model directory, and 6.79 s model/advisor load time.
 
----
+Simulate a DNS anomaly from another terminal:
 
-## 5. Next Steps:
-See [**`SETUP.md`**](./SETUP.md) for the copy-paste test suite and setup details:
-1. **Live Network Alert Watcher:** Tail `traffic_monitor/alerts.jsonl` into `llama_advisor.py`.
-2. **Desktop UI:** Run `aegis_ui.py` for the Live Monitor and Scam Simulator.
-3. **Arm SoC Benchmarking:** Use `tests/benchmark_aegis.py` to record latency, throughput, memory, sustained operation, and offline reliability.
+```bash
+cd traffic_monitor
+sudo python3 test_dns.py
+```
+
+Scapy packet capture requires elevated privileges on Linux and Administrator
+plus Npcap on Windows.
+
+## Repository Layout
+
+```text
+.
+├── README.md
+├── SETUP.md
+├── pyproject.toml
+├── requirements.txt
+├── requirements-lock.txt
+├── llama_advisor.py
+├── aegis_ui.py
+├── llama32_1b_instruct/
+├── phishing_detector/
+├── sms_detector/
+├── traffic_monitor/
+├── tests/
+└── packaging/
+```
+
+Detailed setup, test cases, export commands, and platform build instructions
+are in [SETUP.md](./SETUP.md).

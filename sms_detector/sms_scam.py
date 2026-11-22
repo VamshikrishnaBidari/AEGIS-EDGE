@@ -6,6 +6,7 @@ Run: python scam_detector.py            → asks for SMS text, classifies, loops
 import os
 import re
 import string
+from pathlib import Path
 import joblib
 import pandas as pd
 from scipy.sparse import hstack
@@ -19,8 +20,9 @@ from sklearn.ensemble import VotingClassifier
 from sklearn.metrics import (accuracy_score, precision_score, recall_score,
                              f1_score, classification_report, confusion_matrix)
 
-MODEL_PATH = "scam_model.joblib"
-DATA_PATH = "Bharat SOC/spam.csv"
+MODULE_DIR = Path(__file__).resolve().parent
+MODEL_PATH = str(MODULE_DIR / "scam_model.joblib")
+DATA_PATH = str(MODULE_DIR / "spam.csv")
 THRESHOLD = 0.5   # raise to e.g. 0.7 to reduce false alarms on legit texts
 
 URL_RE = re.compile(r"http\S+|www\.\S+")
