@@ -17,6 +17,8 @@ ExecuTorch/Llama stage generates responses locally without cloud API calls.
 
 ## Distribution Options
 
+**Release downloads:** [AEGIS EDGE v0.1.0](https://github.com/VamshikrishnaBidari/AEGIS-EDGE/releases/tag/v0.1.0)
+
 Choose the option appropriate for your platform:
 
 | Option | Use |
@@ -24,8 +26,8 @@ Choose the option appropriate for your platform:
 | Source repository | Development, audit, or custom installation |
 | Python wheel | Portable Python installation on a compatible OS and architecture |
 | Linux `x86_64` onedir binary | Desktop Linux distribution without a Python environment |
-| Linux ARM64 onedir binary | Jetson or other ARM64 Linux devices |
-| Windows onedir binary | Windows distribution, when a native Windows build is released |
+| Linux ARM64 onedir binary | Released and tested on NVIDIA Jetson Orin Nano (Ubuntu 22.04 / JetPack 6) |
+| Windows onedir binary | Not released or tested as a native binary |
 
 The `llama32_1b_instruct/model.pte` file is deliberately distributed outside
 source packages and executables. It can be generated once or copied as a
@@ -75,8 +77,9 @@ python -m pip install -r requirements.txt
 ```
 
 `requirements.txt` contains the portable dependency set.
-`requirements-lock.txt` is a Jetson Nano environment snapshot and is not
-recommended for other platforms.
+`requirements-lock.txt` is a snapshot of a Jetson environment, not a portable
+or guaranteed reproducible installation. The tested ARM64 release uses prebuilt
+binaries and does not require installing Python dependencies.
 
 ### 3. Obtain the Llama model
 
@@ -111,7 +114,7 @@ optimum-cli export executorch \
   --use_custom_kv_cache \
   --qlinear 8da4w \
   --qembedding 8w \
-  --output_dir ".\llama32_1b_instruct"
+  --output_dir "./llama32_1b_instruct"
 ```
 
 The model is approximately 914 MB and is not downloaded or packaged by the
@@ -144,6 +147,10 @@ python tests/test_llama.py
 ```
 
 ## Install from the Python Wheel
+
+The v0.1.0 wheel installation requires **Python 3.12** and compatible
+architecture-specific PyTorch/ExecuTorch dependencies. For Jetson Orin Nano,
+use the tested ARM64 standalone binaries below instead.
 
 When a `aegis_edge-*.whl` release asset is available:
 
@@ -178,6 +185,8 @@ Python environment.
 
 ## Run a Linux `x86_64` Binary Release
 
+Download the x86_64 archive from the [v0.1.0 release](https://github.com/VamshikrishnaBidari/AEGIS-EDGE/releases/tag/v0.1.0).
+
 Extract the released `aegis_advisor` or `aegis_ui` archive. Place
 `llama32_1b_instruct/` beside the executable distribution:
 
@@ -197,6 +206,53 @@ Run:
 
 Linux binaries require matching `x86_64` host libraries. Live packet capture
 also requires `sudo` or the appropriate packet-capture privileges.
+
+## Install the Linux ARM64 Release (NVIDIA Jetson Orin Nano)
+
+The v0.1.0 ARM64 CLI and GUI binaries were built and tested on an NVIDIA
+Jetson Orin Nano running Ubuntu 22.04 / JetPack 6. Other ARM64 distributions
+have not been verified. These standalone packages do **not** require a Python
+virtual environment.
+
+From the [v0.1.0 release](https://github.com/VamshikrishnaBidari/AEGIS-EDGE/releases/tag/v0.1.0),
+download all three files into the **same directory**:
+
+- `aegis-advisor-0.1.0-linux-arm64.tar.gz`
+- `aegis-ui-0.1.0-linux-arm64.tar.gz`
+- `install_linux_arm64.sh`
+
+Then run on the ARM64 device:
+
+```bash
+chmod +x install_linux_arm64.sh
+./install_linux_arm64.sh
+```
+
+The installer extracts both applications to `~/aegis_edge/` (or
+`$AEGIS_INSTALL_DIR`) and creates launch symlinks in `~/.local/bin/` (or
+`$AEGIS_BIN_DIR`). The model is **not included**.
+
+Place the exported model folder at `~/aegis_edge/llama32_1b_instruct/`,
+containing `model.pte` and tokenizer files. If the model was present when the
+installer ran, it links the model into both application directories. If you
+added the model **after** installation, run:
+
+```bash
+for app in advisor ui; do
+  ln -sfn "$HOME/aegis_edge/llama32_1b_instruct" \
+    "$HOME/aegis_edge/aegis_${app}/llama32_1b_instruct"
+done
+```
+
+Launch from each application directory so the model is found:
+
+```bash
+cd ~/aegis_edge/aegis_advisor && ./aegis_advisor
+cd ~/aegis_edge/aegis_ui && ./aegis_ui
+```
+
+To verify downloads, use `sha256sum -c SHA256SUMS-arm64.txt` in a directory
+containing the ARM64 release archives and checksum file.
 
 ## Benchmarking
 

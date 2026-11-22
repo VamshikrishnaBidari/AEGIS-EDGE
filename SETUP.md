@@ -1,6 +1,6 @@
 # AEGIS EDGE — Complete Setup, Export & Testing Guide (`SETUP.md`)
 
-This guide walks you through setting up and running **AEGIS EDGE** (Problem Statement 3 — ARM Bharat AI-SoC Challenge 2026–27) on **Windows**, **Ubuntu / Debian / Raspberry Pi OS**, or **Fedora Linux**.
+This guide walks you through setting up and running **AEGIS EDGE** (Problem Statement 3 — ARM Bharat AI-SoC Challenge 2026–27) from source on **Windows**, **Ubuntu / Debian / Raspberry Pi OS**, or **Fedora Linux**. The v0.1.0 prebuilt releases support tested **Linux x86_64 (Fedora)** and **Linux ARM64 (Jetson Orin Nano)**.
 
 ---
 
@@ -24,9 +24,10 @@ Because the Network Intrusion module (`traffic_monitor/`) uses `scapy` for live 
 
 ---
 
-## 2. Python Environment & Library Installation (`venv` is Optional!)
+## 2. Python Environment & Library Installation (Source Only)
 
-You can run this project **either** with your global Python installation **or** inside a Python virtual environment (`venv`).
+**Skip this section when installing the prebuilt Linux binaries in Section 4.**
+For source installations, a virtual environment is recommended to avoid conflicts with system packages. The released x86_64 wheel requires Python 3.12; the tested ARM64 standalone binaries bundle their Python runtime.
 
 ### Option A: Without `venv` (Direct / Global Python)
 If you have never used `venv` and already installed packages like `optimum-executorch`, `torch`, or `scikit-learn` globally, **you do not need `venv`**.
@@ -34,7 +35,7 @@ If you have never used `venv` and already installed packages like `optimum-execu
 cd codebase
 pip install -r requirements.txt
 ```
-*(Any packages you already installed globally will be reused automatically without re-downloading. On Linux, if `pip` warns about an externally managed environment, add `--break-system-packages`.)*
+*Global installation can conflict with OS-managed packages. If `pip` reports an externally managed environment, use the virtual environment in Option B instead.*
 
 ### Option B: With `venv` (Optional Isolated Environment)
 If you prefer an isolated environment (or are on Fedora/Ubuntu where `venv` is standard):
@@ -56,12 +57,12 @@ If you prefer an isolated environment (or are on Fedora/Ubuntu where `venv` is s
 > **Why `requirements.txt` is fast and lightweight:**  
 > It includes `--extra-index-url https://download.pytorch.org/whl/cpu` at the top so `pip` pulls the lightweight CPU wheels for `torch` and `optimum-executorch` (matching our XNNPACK `.pte` runtime) instead of downloading 3+ GB of unused NVIDIA CUDA libraries.
 
-### Jetson Nano Reproducible Environment
-For the pinned Jetson Nano environment used for benchmarking, install the Jetson lock file:
+### Jetson Environment Snapshot
+For reference, the project includes an environment snapshot from Jetson development:
 ```bash
 pip install -r requirements-lock.txt
 ```
-`requirements-lock.txt` is a full environment snapshot, not a portable cross-platform dependency list. It contains Jetson/Ubuntu-specific packages and system generated local wheel references, so it may not install unchanged on Raspberry Pi, Windows, or a desktop Linux machine. Use `requirements.txt` for normal setup and the lock file when reproducing the recorded Jetson Nano environment.
+`requirements-lock.txt` is not a portable or guaranteed reproducible dependency list. It may contain Jetson/Ubuntu-specific packages and local wheel references. Use `requirements.txt` for normal source setup; prefer the tested ARM64 binaries for Jetson Orin Nano rather than assuming this lock file will recreate the build environment.
 
 ---
 
@@ -70,7 +71,7 @@ pip install -r requirements-lock.txt
 Because `model.pte` is large, it is excluded from GitHub via `.gitignore`. The current quantized export is approximately 915 MB. The offline tokenizer files (`tokenizer.json`, `tokenizer_config.json`, `special_tokens_map.json`) are already included inside `codebase/llama32_1b_instruct/`.
 
 You can get `model.pte` in **one of two ways**:
-* **Copy a published model folder:** If you have a separately distributed `llama32_1b_instruct` folder, copy it into `codebase/llama32_1b_instruct/`. You do **not** need a Hugging Face account or export step.
+* **Copy a published model folder:** If you have a separately distributed `llama32_1b_instruct` folder, copy it into `codebase/llama32_1b_instruct/`. You do **not** need an export step when using a legally obtained compatible model folder; comply with the Meta Llama license and any applicable access terms.
 * **Export locally once via Hugging Face:** Follow the steps below once on your machine.
 
 ### Step 3.1: Request Meta Llama Access on Hugging Face
@@ -107,7 +108,7 @@ optimum-cli export executorch \
 ```
 On Windows PowerShell, use `--output_dir ".\llama32_1b_instruct"`.
 * **What this does:** Downloads `Llama-3.2-1B-Instruct`, applies 8-bit dynamic activation / 4-bit linear weight quantization (`8da4w`) plus 8-bit embedding quantization (`8w`), enables custom SDPA and KV cache, compiles for the **XNNPACK** CPU backend, and writes `codebase/llama32_1b_instruct/model.pte`.
-* Once the export is complete, run the advisor with `python llama_advisor.py --model-dir ".\llama32_1b_instruct"`. Everything runs 100% offline after export (you can completely disconnect from the internet).
+* Once the export is complete, run the advisor with `python llama_advisor.py --model-dir "./llama32_1b_instruct"`. Everything runs 100% offline after export (you can completely disconnect from the internet).
 
 ---
 
@@ -148,10 +149,39 @@ The UI provides a Live Monitor tab with CPU/RAM/network telemetry and a Scam Sim
 ```bash
 cd codebase
 python tests/benchmark_aegis.py \
-  --model-dir ".\llama32_1b_instruct" \
+  --model-dir "./llama32_1b_instruct" \
   --quant "8da4w / 8w (qembedding)"
 ```
 The benchmark writes a timestamped `benchmark_summary_*.txt` report under `tests/` unless `--out-file` is supplied. Use `--skip sustained` for a faster run, or `--skip sustained offline` for only detection and LLM measurements.
+
+### Install Prebuilt Linux Releases (No Python Environment Required)
+
+**Linux x86_64:** Download the matching standalone archive from the [v0.1.0 release](https://github.com/VamshikrishnaBidari/AEGIS-EDGE/releases/tag/v0.1.0), extract it, and run the executable from its application directory. The `install_linux_x86_64.sh` script is a **wheel installer**, not an installer for the standalone archives; it requires Python 3.12.
+
+**Linux ARM64 / NVIDIA Jetson Orin Nano:** Download `aegis-advisor-0.1.0-linux-arm64.tar.gz`, `aegis-ui-0.1.0-linux-arm64.tar.gz`, and `install_linux_arm64.sh` into the same directory. Then run:
+
+```bash
+chmod +x install_linux_arm64.sh
+./install_linux_arm64.sh
+```
+
+The ARM64 installer extracts both binaries into `~/aegis_edge/` by default. It does not install Python dependencies or download the model. Put the compatible exported model in `~/aegis_edge/llama32_1b_instruct/`. If you add the model after installation, create the links:
+
+```bash
+for app in advisor ui; do
+  ln -sfn "$HOME/aegis_edge/llama32_1b_instruct" \
+    "$HOME/aegis_edge/aegis_${app}/llama32_1b_instruct"
+done
+```
+
+Run the applications from their directories:
+
+```bash
+cd ~/aegis_edge/aegis_advisor && ./aegis_advisor
+cd ~/aegis_edge/aegis_ui && ./aegis_ui
+```
+
+This release was tested on Jetson Orin Nano with Ubuntu 22.04 / JetPack 6; other ARM64 environments are not verified. For file integrity, download `SHA256SUMS-arm64.txt` and run `sha256sum -c SHA256SUMS-arm64.txt` alongside the archives.
 
 ### Build a Wheel and Linux Executables
 
@@ -170,7 +200,7 @@ Run from the repository root on the actual Jetson/Linux ARM64 target:
 bash packaging/build_jetson_linux_arm64.sh
 ```
 
-The build scripts produce:
+The build scripts are developer workflows, not the installation path used to validate the published ARM64 release. ARM64 packaging depends on an appropriate preconfigured Jetson environment; do not assume a clean machine can reproduce the binaries using the script alone. Depending on the build script and environment, outputs may include:
 - `dist/aegis_edge-*.whl`
 - `dist/aegis_advisor/` (`--onedir`)
 - `dist/aegis_ui/` (`--onedir`)
@@ -182,7 +212,7 @@ aegis-advisor
 aegis-ui
 ```
 
-For the standalone builds, copy or generate `llama32_1b_instruct/` beside `dist/`, then run:
+For standalone builds, provide the model in the directory expected by the application (or pass an explicit model path to the CLI). Then run:
 ```bash
 ./dist/aegis_advisor/aegis_advisor
 ./dist/aegis_ui/aegis_ui
@@ -193,7 +223,7 @@ The model is intentionally outside the generated artifacts. This avoids embeddin
 Live packet capture still requires Linux `sudo` or Administrator privileges plus the platform's packet-capture library.
 
 ### Install from the Wheel
-The wheel is a lightweight Python package. It does not include `llama32_1b_instruct/model.pte`.
+The v0.1.0 wheel requires a compatible **Python 3.12** environment. On Jetson Orin Nano, prefer the tested ARM64 binary release above. The wheel is a lightweight Python package. It does not include `llama32_1b_instruct/model.pte`.
 
 ```bash
 python3 -m venv aegis-venv
